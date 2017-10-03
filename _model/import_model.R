@@ -1,26 +1,28 @@
-#' Acquire the processed template responses
-#'
+#' Import the model responses from the raw data.
 get_template_response <- function(file_path) {
     if (missing(file_path)) {
         stop('Missing file path to raw data')
     }
   
     library(tidyr)
+    library(dplyr)
     
     template_response <- get_raw_data(file_path)
     
     template_response <- template_response %>% mutate(TARGET = ifelse(TARGET == 
         1, "vertical", ifelse(TARGET == 2, "horizontal", ifelse(TARGET == 
-        3, "bowtie", ifelse(TARGET == 4, "spot", "error")))))
+        3, "bowtie", ifelse(TARGET == 4, "spot", "error"))))) %>%
+      filter(PYRAMIDLVL %in% c(1,2,3,4,5))
+    
     template_response$TARGET <- as.factor(template_response$TARGET)
     
     bin_values <- get_experiment_bin_values()
     
     template_response <- merge(template_response, bin_values)
     
-    pyramidLvl <- data.frame(PYRAMIDLVL = c(1, 2, 3, 4, 5, 6), 
-        eccentricity = c(0, 1.67, 3.34, 6.68, 13.36, 26.72), 
-        downsampleR = c(1, 2, 4, 8, 16, 32))
+    pyramidLvl <- data.frame(PYRAMIDLVL = c(1, 2, 3, 4, 5), 
+        eccentricity = c(0.000000, 1.381106, 4.621447, 11.509662, 23.099524), 
+        downsampleR = c(1, 2, 4, 8, 16))
     
     template_response <- merge(template_response, pyramidLvl) %>% 
         arrange(TARGET, PYRAMIDLVL, L, C, S)
@@ -44,15 +46,17 @@ get_template_response <- function(file_path) {
     template_response$BIN <- as.factor(template_response$BIN)
     
     # Import multiple response function types.
-    template_response <- template_response %>% mutate(function_name = ifelse(RESPONSEFUNC_NAME == 
-        "occluding_model.lib.response_functions.edgeResponse" & NUM_RESPONSE == 1, "edge_cos", 
-        ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.edgeResponse" & NUM_RESPONSE == 2, "edge_mag", 
-        ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.separableTR" & NUM_RESPONSE == 1, "mean_only", "pattern_only")))) %>%
+    template_response <- template_response %>% 
+      mutate(function_name = ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.edgeResponseMag" & NUM_RESPONSE == 1, "edge_cos", 
+        ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.edgeResponseMag" & NUM_RESPONSE == 2, "edge_mag", 
+        ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.separableTR" & NUM_RESPONSE == 1, "mean_only", 
+               "pattern_only")))) %>%
   select(-RESPONSEFUNC, -NUM_RESPONSE, -RESPONSEFUNC_NAME)
     
     template_response <- template_response %>% filter(function_name %in% 
         c("pattern_only", "mean_only", "edge_cos")) %>% arrange(TARGET, 
         BIN, statType, eccentricity)
+    
     return(template_response)
 }
 
@@ -66,24 +70,23 @@ get_raw_data <- function(file_path) {
 
 #' Return bin values used in the experiment
 get_experiment_bin_values <- function() {
-    BIN <- seq(1, 15, 1)
-    luminance <- c(1, 3, 5, 7, 9, 10, 5, 5, 5, 5, 5, 5, 5, 5, 
-        5)
-    contrast <- c(5, 5, 5, 5, 5, 5, 3, 7, 9, 10, 5, 5, 5, 5, 
-        5)
-    similarity <- c(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 3, 7, 9, 
-        10)
+    BIN        <- seq(1, 15, 1)
     
-    experiment_bins <- data.frame(BIN = BIN, L = luminance, C = contrast, 
-        S = similarity)
-    bin_values <- get_bin_values() %>% mutate(TARGET = TARGET_NAME) %>% 
-        select(-TARGET_NAME)
+    luminance  <- c(1, 3, 5, 7, 9, 10, 5, 5, 5, 5, 5, 5, 5, 5, 5)
+    contrast   <- c(5, 5, 5, 5, 5, 5, 3, 7, 9, 10, 5, 5, 5, 5, 5)
+    similarity <- c(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 3, 7, 9, 10)
+    
+    experiment_bins <- data.frame(BIN = BIN, L = luminance, C = contrast, S = similarity)
+    
+    bin_values <- get_bin_values() %>%
+      mutate(TARGET = TARGET_NAME) %>% 
+      select(-TARGET_NAME)
     
     
     experiment_bin_values <- merge(experiment_bins, bin_values)
     
-    experiment_bin_values <- experiment_bin_values %>% gather(key = statType, 
-        value = statValue, Lvals, Cvals, Svals)
+    experiment_bin_values <- experiment_bin_values %>% 
+      gather(key = statType, value = statValue, Lvals, Cvals, Svals)
     
     experiment_bin_values <- experiment_bin_values %>% filter((statType == 
         "Lvals" & BIN %in% c(1, 2, 3, 4, 5, 6)) | (statType == 
@@ -102,34 +105,30 @@ get_experiment_bin_values <- function() {
 #' Return a dataframe that contains all the statistics of the bins that are used.
 get_bin_values <- function() {
     
-    Lvals <- (c(2.9627, 4.1447, 5.7984, 8.1117, 11.348, 15.8755, 
-        22.2093, 31.07, 43.4659, 60.8073))
-    Cvals <- (c(0.0247, 0.0364, 0.0536, 0.079, 0.1163, 0.1713, 
-        0.2523, 0.3716, 0.5472, 0.8059))
-    Sa1vals <- (c(0.4255, 0.4577, 0.4923, 0.5295, 0.5696, 0.6127, 
-        0.659, 0.7088, 0.7625, 0.8201))
-    Sa2vals <- (c(0.4454, 0.4774, 0.5117, 0.5484, 0.5878, 0.6299, 
-        0.6751, 0.7236, 0.7755, 0.8312))
-    Sa3vals <- (c(0.5394, 0.5584, 0.5781, 0.5986, 0.6197, 0.6416, 
-        0.6643, 0.6877, 0.712, 0.7372))
-    Sa4vals <- (c(0.6973, 0.712, 0.727, 0.7423, 0.7579, 0.7739, 
-        0.7902, 0.8069, 0.8239, 0.8412))
+    Lvals <- (c(2.9627, 4.1447, 5.7984, 8.1117, 11.348, 15.8755, 22.2093, 31.07, 43.4659, 60.8073))
+    Cvals <- (c(0.0247, 0.0364, 0.0536, 0.079, 0.1163, 0.1713, 0.2523, 0.3716, 0.5472, 0.8059))
+    Sa1vals <- (c(0.4255, 0.4577, 0.4923, 0.5295, 0.5696, 0.6127, 0.659, 0.7088, 0.7625, 0.8201))
+    Sa2vals <- (c(0.4454, 0.4774, 0.5117, 0.5484, 0.5878, 0.6299, 0.6751, 0.7236, 0.7755, 0.8312))
+    Sa3vals <- (c(0.5394, 0.5584, 0.5781, 0.5986, 0.6197, 0.6416, 0.6643, 0.6877, 0.712, 0.7372))
+    Sa4vals <- (c(0.6973, 0.712, 0.727, 0.7423, 0.7579, 0.7739, 0.7902, 0.8069, 0.8239, 0.8412))
     
-    L <- data.frame(Lvals, L = 1:10)
-    C <- data.frame(Cvals, C = 1:10)
-    Sa1 <- data.frame(Svals = Sa1vals, S = 1:10, TARGET = factor(rep("1", 
-        10)), TARGET_NAME = factor(rep("vertical", 10)))
-    
-    Sa2 <- data.frame(Svals = Sa2vals, S = 1:10, TARGET = factor(rep("2", 
-        10)), TARGET_NAME = factor(rep("horizontal", 10)))
-    
-    Sa3 <- data.frame(Svals = Sa3vals, S = 1:10, TARGET = factor(rep("3", 
-        10)), TARGET_NAME = factor(rep("bowtie", 10)))
-    
-    Sa4 <- data.frame(Svals = Sa4vals, S = 1:10, TARGET = factor(rep("4", 
-        10)), TARGET_NAME = factor(rep("spot", 10)))
-    
-    S <- rbind(Sa1, Sa2, Sa3, Sa4)
+    L   <- data.frame(Lvals, L = 1:10)
+    C   <- data.frame(Cvals, C = 1:10)
+    Sa1 <- data.frame(Svals = Sa1vals, S = 1:10, TARGET = factor(rep("1", 10)), TARGET_NAME = factor(rep("vertical", 10)))
+    Sa2 <- data.frame(Svals = Sa2vals, S = 1:10, TARGET = factor(rep("2", 10)), TARGET_NAME = factor(rep("horizontal", 10)))
+    Sa3 <- data.frame(Svals = Sa3vals, S = 1:10, TARGET = factor(rep("3", 10)), TARGET_NAME = factor(rep("bowtie", 10)))
+    Sa4 <- data.frame(Svals = Sa4vals, S = 1:10, TARGET = factor(rep("4", 10)), TARGET_NAME = factor(rep("spot", 10)))
+    S   <- rbind(Sa1, Sa2, Sa3, Sa4)
     
     bin_values <- merge(merge(L, C), S)
+}
+
+#' Get eccentricities
+#' Get receptive field spacing based on Drasdo.
+get_eccentricity <- function(model_space, direction = "temporal") {
+  pyramid_space    <- c(0.008333333333,0.01666666667,0.03333333333,0.06666666667,0.1333333333)
+  degrees          <- c(0,0.25,0.5,1,2,5,10,15,20,25,30)
+  temporal_spacing <- c(0.008333333333,0.01004093745,0.01161866051,0.01457454651,0.02006415268,0.03524948451,0.05943852855,0.08337812416,0.115259782,0.1444151473,  0.1813126962)
+  
+  return(approx(spacing, degrees, pyramid_space))
 }

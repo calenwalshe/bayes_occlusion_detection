@@ -42,7 +42,7 @@ get_interpolated_model_responses <- function(template_response,
 #' @import broom dplyr
 #' @examples
 get_all_interpolated <- function(template_response) {
-    source(broom)
+    library(broom)
     df <- expand.grid(c(as.character(unique(template_response$TARGET))), 
         c(seq(0.5, 24, length.out = 16)), in_bin = 1:15, in_function_name = c("edge_cos", 
             "mean_only", "pattern_only"), in_tpresent = c("present", 

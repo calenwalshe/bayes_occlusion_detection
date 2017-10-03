@@ -1,232 +1,197 @@
-pink_template_stat <- function(statType = 'tSigma', bPresent = 0, target = "vertical") {
+# Import the template response data from disk.
+import_template_stats <- function(file_path = '~/Dropbox/Calen/Dropbox/') {
   
-  templateSigmaAbs  <- read.table('~/Dropbox/Calen/Dropbox/tMatchpink_Response_sigma.txt', header = T, sep = '\t') %>% mutate(PRESENT = 0)
-  templateMeanAbs   <- read.table('~/Dropbox/Calen/Dropbox/tMatchpink_Response_mean.txt', header = T, sep = '\t') %>% mutate(PRESENT = 0)
+  template.sigma  <- read.table(paste0(file_path, 'tMatch_sigma.txt'), header = T, sep = '\t') %>% 
+    mutate(type = "sigma")
+  template.mean   <- read.table(paste0(file_path, 'tMatch_mean.txt'), header = T, sep = '\t') %>% 
+    mutate(type = "mean")
   
-  templateSigma     <- rbind(templateSigmaAbs, templateMeanAbs)
+  template.stats     <- rbind(template.sigma, template.mean) %>% 
+    spread(type, tSigma) %>%
+    mutate(PRESENT = 0)
   
-  templateAll       <- templateSigma %>% group_by(L,C,S,PYRAMIDLVL,TARGET) %>% arrange(L,C,S,TARGET, PRESENT)
+  template.stats$TARGET <- factor(template.stats$TARGET, labels = c("vertical", "horizontal", "bowtie", "spot"))
   
-  bin_values        <- get_bin_values()
+  bin.values        <- get_bin_values() %>%
+    mutate(TARGET = TARGET_NAME, TARGET_NAME = NULL)
+
+  template.stats     <- template.stats %>%
+    merge(., bin.values)
   
-  templateStats     <- templateAll %>% merge(., bin_values) %>% filter(TARGET_NAME == target) %>% filter(PRESENT == bPresent)
+  return(template.stats)
+}
+
+# Import the edge response data from disk.
+import_edge_stats <- function(file_path = '~/Dropbox/Calen/Dropbox/') {
   
-  fig               <- ggplot(data = templateStats, aes(x = Svals, y = tSigma, shape = TARGET_NAME, colour = as.factor(Cvals))) +
-    geom_point() + facet_wrap(~Lvals, ncol = 3, scales = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
+  edge.sigma  <- read.table(paste0(file_path, 'Eabs_sigma.txt'), header = T, sep = '\t') %>% 
+    mutate(type = "sigma")
+  edge.mean   <- read.table(paste0(file_path, 'Eabs_mean.txt'), header = T, sep = '\t') %>% 
+    mutate(type = "mean")
   
-  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
+  edge.stats     <- rbind(edge.sigma, edge.mean) %>% 
+    spread(type, tSigma) %>%
+    mutate(PRESENT = 0)
+  
+  edge.stats$TARGET <- factor(edge.stats$TARGET, labels = c("vertical", "horizontal", "bowtie", "spot"))
+  
+  bin.values        <- get_bin_values() %>%
+    mutate(TARGET = TARGET_NAME, TARGET_NAME = NULL)
+  
+  edge.stats     <- edge.stats %>%
+    merge(., bin.values)
+  
+  return(edge.stats)
+}
+
+# Compute and save the edge standard deviations.
+edge_stat <- function(statType = 'Eabs', target = 'vertical') {
+  library(dplyr)
+  library(ggplot2)
+  
+  edge.stats <- import_edge_stats() %>%
+    filter(TARGET == target)
+  
+  edge.all       <- edge.stats %>%
+    group_by(L,C,S,PYRAMIDLVL,TARGET) %>%
+    arrange(L,C,S,TARGET, PRESENT)
+  
+  #template.stats$Cvals <- as.factor(template.stats$Cvals)
+  edge.all$Svals <- as.factor(edge.all$Svals)
+  
+  fig <- ggplot(data = edge.all, aes(x = Svals, y = sigma, shape = TARGET, colour = as.factor(Cvals))) +
+    geom_point() + 
+    facet_wrap(~Lvals, ncol = 3) +
+    theme(aspect.ratio = 1)# +
+    #scale_color_brewer(palette="Spectral")
+  
+  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/', target, '_', statType, '.pdf'), width = 50, height = 50, units = "cm")
   
   plot(fig)
 }
 
-pink_edge_stat <- function(statType = 'tSigma', bPresent = 0, target = "vertical") {
-  edgeSigmaAbs <- read.table('~/Dropbox/Calen/Dropbox/Eabspink_Response_sigma.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(0))
-  edgeSigmaPres <- read.table('~/Dropbox/Calen/Dropbox/Eprespink_Response_sigma.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(1))
-  
-  edgeMeanAbs  <- read.table('~/Dropbox/Calen/Dropbox/Eabspink_Response_mean.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(0), tmu = tSigma, tSigma = NULL)
-  edgeMeanPres <- read.table('~/Dropbox/Calen/Dropbox/Eprespink_Response_mean.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(1), tmu = tSigma, tSigma = NULL)
-  
-  edgeAbs  <- merge(edgeSigmaAbs, edgeMeanAbs)
-  edgePres <- merge(edgeSigmaPres, edgeMeanPres)
-  
-  edgeAll  <- rbind(edgeAbs, edgePres) %>% group_by(L,C,S,PYRAMIDLVL,TARGET) %>% arrange(L,C,S,TARGET, PRESENT)
-  
-  bin_values         <- get_bin_values()
-  
-  edgeStatistics     <- edgeAll %>% merge(., bin_values) %>% filter(TARGET_NAME == target) %>% filter(PRESENT == bPresent)
-  
-  # All bins
-  if(statType == "tmu") {
-    fig <- ggplot(data = edgeStatistics, aes(x = Svals, y = tmu, shape = (TARGET_NAME), colour = as.factor(Cvals))) +
-      geom_point() + 
-      facet_wrap(~Lvals, ncol = 3) +
-      theme(aspect.ratio = 1) +
-      scale_color_brewer(palette="Spectral")
-  }else{
-    fig <- ggplot(data = edgeStatistics, aes(x = Svals, y = tSigma, shape = (TARGET_NAME), colour = as.factor(Cvals))) +
-      geom_point() + 
-      facet_wrap(~Lvals, ncol = 3) +
-      theme(aspect.ratio = 1) +
-      scale_color_brewer(palette="Spectral")
-  }
-  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'pink_',target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")  
-  
-  
-  # Only Contrast
-  contrastStats <- edgeAll %>% merge(., bin_values)
-  if(statType == "tmu") {
-    contrastStats <- contrastStats %>% group_by(Cvals, PRESENT, TARGET_NAME) %>% summarize(tmu = mean(tmu, na.rm = T))    
-  }else{
-    contrastStats <- contrastStats %>% group_by(Cvals, PRESENT, TARGET_NAME) %>% summarize(tSigma = mean(tSigma, na.rm = T))        
-  }
-  
-  fig_contrast <- ggplot(data = contrastStats, aes_string(x = 'Cvals', y = statType, colour = "TARGET_NAME")) +
-    geom_point() +
-    facet_wrap(~PRESENT, scales = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig_contrast, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'pink_', 'con_', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig_contrast)
-  
-  # Only Luminance
-  
-  lumStats <- edgeAll %>% merge(., bin_values)
-  
-  if(statType == "tmu") {
-    lumStats <- lumStats %>% group_by(Lvals, PRESENT, TARGET_NAME) %>% summarize(tmu = mean(tmu, na.rm = T))    
-  }else{
-    lumStats <- lumStats %>% group_by(Lvals, PRESENT, TARGET_NAME) %>% summarize(tSigma = mean(tSigma, na.rm = T))        
-  }
-  
-  fig_lum <- ggplot(data = lumStats, aes_string(x = 'Lvals', y = statType, colour = "TARGET_NAME")) +
-    geom_point() +
-    facet_wrap(~PRESENT, scales = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig_lum, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'pink_', 'lum_', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig_lum)
-  
-  # Only similarity
-  simStats <- edgeAll %>% merge(., bin_values)
-  if(statType == "tmu") {
-    simStats <- simStats %>% group_by(Svals, PRESENT, TARGET_NAME) %>% summarize(tmu = mean(tmu, na.rm = T))    
-  }else{
-    simStats <- simStats %>% group_by(Svals, PRESENT, TARGET_NAME) %>% summarize(tSigma = mean(tSigma, na.rm = T))        
-  }
-  fig_sim <- ggplot(data = simStats, aes_string(x = 'Svals', y = statType, linetype = 'PRESENT', colour = "TARGET_NAME")) +
-    geom_point() +
-    facet_wrap(~PRESENT, scale = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig_sim, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'pink_', 'sim_', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig_sim)  
-}
-
-template_stat <- function(statType = 'tSigma', bPresent = 0, target = "vertical") {
+# Compute and save the template response standard deviations.
+template_stat <- function(statType = 'tSigma', target = "vertical") {
   
   library(dplyr)
   library(ggplot2)
   
-  templateSigmaAbs  <- read.table('~/Dropbox/Calen/Dropbox/tMatch_Response_sigma.txt', header = T, sep = '\t') %>% mutate(PRESENT = 0)
-  templateMeanAbs   <- read.table('~/Dropbox/Calen/Dropbox/tMatch_Response_mean.txt', header = T, sep = '\t') %>% mutate(PRESENT = 0)
+  template.stats <- import_template_stats() %>%
+    filter(TARGET == target)
   
-  templateSigma     <- rbind(templateSigmaAbs, templateMeanAbs)
+  template.all       <- template.stats %>%
+    group_by(L,C,S,PYRAMIDLVL,TARGET) %>%
+    arrange(L,C,S,TARGET, PRESENT)
   
-  templateAll       <- templateSigma %>% group_by(L,C,S,PYRAMIDLVL,TARGET) %>% arrange(L,C,S,TARGET, PRESENT)
+  #template.stats$Cvals <- as.factor(template.stats$Cvals)
+  template.all$Svals <- as.factor(template.all$Svals)
   
-  bin_values        <- get_bin_values()
-  templateStats     <- templateAll %>% merge(., bin_values) %>% filter(TARGET_NAME == target) %>% filter(PRESENT == bPresent)
-  
-  templateStats$Cvals <- as.factor(templateStats$Cvals)
-  
-  fig               <- ggplot(data = templateStats, aes_string(x = 'Svals', y = statType, shape = 'TARGET_NAME', colour = 'Cvals')) +
+  fig <- ggplot(data = template.all, aes(x = Cvals, y = sigma, shape = TARGET, colour = Svals)) +
     geom_point() + 
     facet_wrap(~Lvals, ncol = 3, scales = "free_y") +
     theme(aspect.ratio = 1) +
     scale_color_brewer(palette="Spectral")
   
-  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
+  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/', target, '_', statType, '.pdf'), width = 50, height = 50, units = "cm")
   
   plot(fig)
 }
 
-edge_stat <- function(statType = 'tSigma', bPresent = 0, target = "vertical") {
+# Function edge_historgram
+# Description: Compute histograms of edge responses in bins. 
+edge_histogram <- function(target = 1) {
+  library(ggplot2)
+  library(dplyr)
   
-  edgeSigmaAbs <- read.table('~/Dropbox/Calen/Dropbox/Eabs_Response_sigma.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(0))
-  edgeSigmaPres <- read.table('~/Dropbox/Calen/Dropbox/Epres_Response_sigma.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(1))
+  lum <- 5
   
-  edgeMeanAbs  <- read.table('~/Dropbox/Calen/Dropbox/Eabs_Response_mean.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(0), tmu = tSigma, tSigma = NULL)
-  edgeMeanPres <- read.table('~/Dropbox/Calen/Dropbox/Epres_Response_mean.txt', header = T, sep = '\t') %>% mutate(PRESENT = as.factor(1), tmu = tSigma, tSigma = NULL)
+  alledgeSigmaAbs <- read.table('~/Dropbox/Calen/Dropbox/Epres_AllResponse_mean.txt', header = T, sep = '\t') %>%
+    mutate(PRESENT = as.factor(0))
   
-  edgeAbs  <- merge(edgeSigmaAbs, edgeMeanAbs)
-  edgePres <- merge(edgeSigmaPres, edgeMeanPres)
-
-  edgeAll  <- rbind(edgeAbs, edgePres) %>% group_by(L,C,S,PYRAMIDLVL,TARGET) %>% arrange(L,C,S,TARGET, PRESENT)
+  edgeStatistics     <- alledgeSigmaAbs %>% 
+    filter(TARGET == target)
   
-  bin_values         <- get_bin_values()
+  fig_lum <- ggplot(data = edgeStatistics, aes(x = resp, colour = as.factor(lum))) +
+    geom_freqpoly() +
+    facet_wrap(~C, scale = "free_y") +
+    theme(aspect.ratio = 1)
   
+  fig_lum <- ggplot(data = edgeStatistics %>% filter(L == lum)
+                    , aes(x = resp, colour = as.factor(lum))) +
+    geom_histogram(binwidth = .01) +
+    facet_wrap(~C, scale = "free_y") + 
+    theme(aspect.ratio = 1)  
   
-  edgeStatistics     <- edgeAll %>% merge(., bin_values) %>% filter(TARGET_NAME == target) %>% filter(PRESENT == bPresent)
-  # All bins
-  if(statType == "tmu") {
-    fig <- ggplot(data = edgeStatistics, aes(x = Svals, y = tmu, shape = (TARGET_NAME), colour = as.factor(Cvals))) +
-      geom_point() + 
-      facet_wrap(~Lvals, ncol = 3) +
-      theme(aspect.ratio = 1) +
-      scale_color_brewer(palette="Spectral")
-  }else{
-    fig <- ggplot(data = edgeStatistics, aes(x = Svals, y = tSigma, shape = (TARGET_NAME), colour = as.factor(Cvals))) +
-      geom_point() + 
-      facet_wrap(~Lvals, ncol = 3) +
-      theme(aspect.ratio = 1) +
-      scale_color_brewer(palette="Spectral")
-  }
-  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")  
-
-
-  # Only Contrast
-  contrastStats <- edgeAll %>% merge(., bin_values)
-  if(statType == "tmu") {
-    contrastStats <- contrastStats %>% group_by(Cvals, PRESENT, TARGET_NAME) %>% summarize(tmu = mean(tmu, na.rm = T))    
-  }else{
-    contrastStats <- contrastStats %>% group_by(Cvals, PRESENT, TARGET_NAME) %>% summarize(tSigma = mean(tSigma, na.rm = T))        
-  }
-
-  fig_contrast <- ggplot(data = contrastStats, aes_string(x = 'Cvals', y = statType, colour = "TARGET_NAME")) +
-    geom_point() +
-    facet_wrap(~PRESENT, scales = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig_contrast, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'con_', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
-    
-  plot(fig_contrast)
-  
-  # Only Luminance
-  
-  lumStats <- edgeAll %>% merge(., bin_values)
-  
-  if(statType == "tmu") {
-    lumStats <- lumStats %>% group_by(Lvals, PRESENT, TARGET_NAME) %>% summarize(tmu = mean(tmu, na.rm = T))    
-  }else{
-    lumStats <- lumStats %>% group_by(Lvals, PRESENT, TARGET_NAME) %>% summarize(tSigma = mean(tSigma, na.rm = T))        
-  }
-  
-  fig_lum <- ggplot(data = lumStats, aes_string(x = 'Lvals', y = statType, colour = "TARGET_NAME")) +
-    geom_point() +
-    facet_wrap(~PRESENT, scales = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig_lum, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'lum_', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig_lum)
-
-  # Only similarity
-  simStats <- edgeAll %>% merge(., bin_values)
-  if(statType == "tmu") {
-    simStats <- simStats %>% group_by(Svals, PRESENT, TARGET_NAME) %>% summarize(tmu = mean(tmu, na.rm = T))    
-  }else{
-    simStats <- simStats %>% group_by(Svals, PRESENT, TARGET_NAME) %>% summarize(tSigma = mean(tSigma, na.rm = T))        
-  }
-  fig_sim <- ggplot(data = simStats, aes_string(x = 'Svals', y = statType, linetype = 'PRESENT', colour = "TARGET_NAME")) +
-    geom_point() +
-    facet_wrap(~PRESENT, scale = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig_sim, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'sim_', target, '_', statType, '_', as.character(bPresent), '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig_sim)  
+  ggsave(fig_lum, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'edge_hist_', lum, target, '_', '.pdf'), width = 50, height = 50, units = "cm")
 }
 
+# Fit a function to the standard standard deviations of the template responses.
+fit.template.stats <- function(target) {
+  template.stats <- import_template_stats() %>%
+    filter(!is.nan(sigma)) %>%
+    filter(TARGET == target)
 
+  Lvals <- template.stats$Lvals 
+  Cvals <- template.stats$Cvals
+  Svals <- template.stats$Svals
+  
+  sigma <- template.stats$sigma
 
+  m1 <- mle2(sigma ~ dnorm(mean = k0 * (Lvals + a)*(I(Cvals) + b)*(I(Svals)^2 + c), sd = 1),
+             start = list(k0 = 1, a = 0,b = 0,c = 0),
+             data = data.frame(Lvals = Lvals, Cvals = Cvals, Svals = Svals, sigma = sigma))
+  
+  (var(sigma) - var(residuals(m1)))/var(sigma)
+  
+  template.stats.predict <- template.stats
+  template.stats.predict$sigma <- predict(m1)
+  
+  fig <- ggplot(data = template.stats, aes(x = Cvals, y = sigma, colour = as.factor(Svals))) +
+    geom_point() + 
+    geom_line(data = template.stats.predict, aes(x = Cvals, y = sigma,  colour = as.factor(Svals))) + 
+    facet_wrap(~Lvals, ncol = 3) +
+    theme(aspect.ratio = 1)# +
+  
+  plot(fig)
+}
+
+# Fit a function to the standard deviation of the edge responses.
+fit.edge.stats <- function(target) {
+  edge.stats <- import_edge_stats() %>%
+    filter(!is.nan(sigma)) %>%
+    filter(TARGET == target)
+  
+  Lvals <- edge.stats$Lvals 
+  Cvals <- edge.stats$Cvals
+  Svals <- edge.stats$Svals
+  
+  sigma <- edge.stats$sigma
+  
+  m1 <- mle2(sigma ~ dnorm(mean = (a*Lvals) + (c*Cvals) + e*Lvals*Cvals, sd = 1),
+             start = list(k0 = 1, a = 1,b = 1,c = 1,d = 1, e = 1, f = 1),
+             data = data.frame(Lvals = Lvals, Cvals = Cvals, Svals = Svals, sigma = sigma))
+  
+  print((var(sigma) - var(residuals(m1)))/var(sigma))
+  
+  edge.stats.predict       <- edge.stats
+  edge.stats.predict$sigma <- as.numeric(predict(m1))
+  
+  edge.stats.predict       <- edge.stats.predict %>%
+    group_by(L,C,S,PYRAMIDLVL,TARGET) %>%
+    arrange(L,C,S,TARGET, PRESENT)
+  
+  edge.stats.predict$Svals <- as.numeric(edge.stats.predict$Svals)
+  edge.stats$Svals <- as.numeric(edge.stats$Svals)
+
+  # Plot Edge Statistic
+  
+  fig <- ggplot(data = edge.stats, aes(x = Svals , y = (sigma), colour = as.factor(Cvals))) +
+    geom_point() + 
+    geom_line(data = edge.stats.predict, aes(x = Svals, y = (sigma),  colour = as.factor(Cvals))) + 
+    facet_wrap(~Lvals, ncol = 3) +
+    theme(aspect.ratio = 1)# +
+  
+  plot(fig)
+  
+  ggsave(file = paste0('~/Dropbox/Calen/Dropbox/edge_', target, 'model.pdf'), fig, width = 40, height = 40)
+}

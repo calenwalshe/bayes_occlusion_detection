@@ -1,4 +1,6 @@
-plot_vss_psychometrics <- function(human.psychometrics, performance_measures) {
+plot_vss_psychometrics <- function(psychometric_parameters, performance_measures) {
+  library(ggplot2)
+  library(dplyr)
     sub_params <- psychometric_parameters %>% filter(BIN == 3) %>% data.frame()
     
     sub_response <- performance_measures %>% filter(BIN == 3) %>% data.frame()

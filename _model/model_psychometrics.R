@@ -109,9 +109,10 @@ get_model_psychometric <- function(model_dprime) {
     return(param_df)
 }
 
+#' Return start parameters for the model.
 get_start_params <- function(model_dprime, custom_starts) {
-    
-    start_params <- model_dprime %>% select(TARGET, BIN, function_name) %>% 
+    start_params <- model_dprime %>% 
+      select(TARGET, BIN, function_name) %>% 
         distinct()
     
     start_params$b <- 3
@@ -136,13 +137,10 @@ get_start_params <- function(model_dprime, custom_starts) {
             }
         }
     }
-    
-    
-    
+
     return(start_params)
     
 }
-
 
 #' Return model parameters fit with maximum likelihood
 get_model_mle_params <- function(model_responses) {

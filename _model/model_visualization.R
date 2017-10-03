@@ -16,7 +16,7 @@ plot_all_single_eccentricity <- function(human.psychometrics,
         summarize(pc = mean(pc)) %>% ungroup() %>% mutate(dprime = 2 * 
         as.numeric(qnorm(pc)), SUBJECT = "human") %>% data.frame
     
-    model_dat <- performance_measures %>% select(TARGET, BIN, 
+    model_dat <- model.dprime %>% select(TARGET, BIN, 
         eccentricity, percent_correct, dprime) %>% rowwise() %>% 
         mutate(pc = percent_correct, dprime = 2 * as.numeric(qnorm(pc)), 
             percent_correct = NULL, SUBJECT = "model") %>% data.frame
@@ -27,7 +27,7 @@ plot_all_single_eccentricity <- function(human.psychometrics,
     fig <- ggplot(dat, aes(x = eccentricity, y = pc_diff)) + 
         geom_point() + facet_grid(~TARGET)
     
-    ggsave(last_plot(), file = "~/Dropbox/Calen/Dropbox/tmp_images/compare_pc.pdf")
+    ggsave(last_plot(), file = "~/Dropbox/Calen/Dropbox/compare_pc.pdf")
     print(1)
 }
 

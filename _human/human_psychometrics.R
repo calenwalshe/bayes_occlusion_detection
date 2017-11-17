@@ -1,5 +1,5 @@
 #' Import human data from raw text.
-get_human_responses <- function(path = '/Users/rcw/Dropbox/Calen/Work/occluding/detection_model/_data/exported/human_data.txt') {
+get_human_responses <- function(path = '~/Dropbox/Calen/Work/occluding/detection_model/_data/exported/human_data.txt') {
     library(dplyr)
     library(tidyr)
   
@@ -33,160 +33,54 @@ get_human_detect <- function(human_data) {
     }
     experiment_bin_values <- get_experiment_bin_values()
     
-    human_detect <- human_data %>% group_by(SUBJECT, ECCENTRICITY, 
-        BIN, TARGET) %>% summarize(hit = sum(HIT == 1)/(sum(HIT == 
-        1) + sum(MISS == 1)), miss = sum(MISS == 1)/(sum(MISS == 
-        1) + sum(HIT == 1)), falsealarm = sum(FALSEALARM == 1)/(sum(FALSEALARM == 
-        1) + sum(CORRECTREJECTION == 1)), correctrejection = sum(CORRECTREJECTION == 
-        1)/(sum(CORRECTREJECTION == 1) + sum(FALSEALARM == 1)), 
-        percent_correct = mean(CORRECT)) %>% mutate(hit_adj = ifelse(hit == 
-        0, 1/1200, ifelse(hit == 1, 1199/1200, hit)), falsealarm_adj = ifelse(falsealarm == 
-        0, 1/1200, ifelse(falsealarm == 1, 1199/1200, falsealarm)), 
-        percent_correct_adj = ifelse(percent_correct == 1, 2399/2400, 
-            percent_correct), percent_correct_adj = ifelse(percent_correct == 
-            0, 1/2400, percent_correct)) %>% mutate(dprime = qnorm(hit_adj) - 
-        qnorm(falsealarm_adj)) %>% mutate(bias = dprime/2 - qnorm(hit_adj)) %>% 
-        merge(., experiment_bin_values, by = c("BIN", "TARGET")) %>% 
-        rename(eccentricity = ECCENTRICITY) %>% arrange(SUBJECT, 
-        BIN, TARGET, eccentricity, percent_correct) %>% data.frame()
+    human_detect <- human_data %>% 
+      group_by(SUBJECT, ECCENTRICITY, BIN, TARGET) %>%
+      summarize(hit = sum(HIT == 1)/(sum(HIT == 1) + sum(MISS == 1)), miss = sum(MISS == 1)/(sum(MISS == 1) + sum(HIT == 1)), falsealarm = sum(FALSEALARM == 1)/(sum(FALSEALARM == 1) + sum(CORRECTREJECTION == 1)), correctrejection = sum(CORRECTREJECTION == 1)/(sum(CORRECTREJECTION == 1) + sum(FALSEALARM == 1)), percent_correct = mean(CORRECT)) %>% mutate(hit_adj = ifelse(hit == 0, 1/1200, ifelse(hit == 1, 1199/1200, hit)), falsealarm_adj = ifelse(falsealarm == 0, 1/1200, ifelse(falsealarm == 1, 1199/1200, falsealarm)), percent_correct_adj = ifelse(percent_correct == 1, 2399/2400, percent_correct), percent_correct_adj = ifelse(percent_correct == 0, 1/2400, percent_correct)) %>% 
+      mutate(dprime = qnorm(hit_adj) - qnorm(falsealarm_adj)) %>% 
+      mutate(bias = dprime/2 - qnorm(hit_adj)) %>%
+      merge(., experiment_bin_values, by = c("BIN", "TARGET")) %>%
+      rename(eccentricity = ECCENTRICITY) %>% 
+      arrange(SUBJECT, BIN, TARGET, eccentricity, percent_correct) %>% 
+      data.frame()
     
     human_detect$TARGET <- factor(human_detect$TARGET, levels = c("vertical", "horizontal", "bowtie", "spot"), ordered = T)
-    human_detect        <- human_detect %>% arrange(SUBJECT, statType, TARGET, BIN, eccentricity)
+    
+    human_detect        <- human_detect %>% 
+      arrange(SUBJECT, statType, TARGET, BIN, eccentricity)
+    
     return(human_detect)
+}
+
+# Compute summary statistics for the model from the raw responses
+get_model_detect <- function(model_data) {
+  experiment_bin_values <- get_experiment_bin_values()
+  
+  model_detect <- model_data %>% 
+    group_by(SUBJECT, ECCENTRICITY, BIN, TARGET) %>%
+    summarize(hit = sum(HIT == 1)/(sum(HIT == 1) + sum(MISS == 1)), miss = sum(MISS == 1)/(sum(MISS == 1) + sum(HIT == 1)), falsealarm = sum(FALSEALARM == 1)/(sum(FALSEALARM == 1) + sum(CORRECTREJECTION == 1)), correctrejection = sum(CORRECTREJECTION == 1)/(sum(CORRECTREJECTION == 1) + sum(FALSEALARM == 1)), percent_correct = mean(CORRECT)) %>% mutate(hit_adj = ifelse(hit == 0, 1/1200, ifelse(hit == 1, 1199/1200, hit)), falsealarm_adj = ifelse(falsealarm == 0, 1/1200, ifelse(falsealarm == 1, 1199/1200, falsealarm)), percent_correct_adj = ifelse(percent_correct == 1, 2399/2400, percent_correct), percent_correct_adj = ifelse(percent_correct == 0, 1/2400, percent_correct)) %>% 
+    mutate(dprime = (qnorm(hit_adj) - qnorm(falsealarm_adj))) %>% 
+    mutate(bias = dprime/2 - qnorm(hit_adj)) %>%
+    merge(., experiment_bin_values, by = c("BIN", "TARGET")) %>%
+    rename(eccentricity = ECCENTRICITY) %>% 
+    arrange(SUBJECT, BIN, TARGET, eccentricity, percent_correct) %>% 
+    data.frame()
+  
+  model_detect$TARGET <- factor(model_detect$TARGET, levels = c("vertical", "horizontal", "bowtie", "spot"), ordered = T)
+  
+  model_detect        <- model_detect %>% 
+    arrange(SUBJECT, statType, TARGET, BIN, eccentricity)
+  
+  return(model_detect)
 }
 
 #' Compute a summary of the number of observers per condition in the raw data.
 compute_raw_summary <- function(human.responses) {
-  summary.dat <- human.responses %>% select(SUBJECT, TARGET, BIN, ECCENTRICITY) %>%
+  summary.dat <- human.responses %>% 
+    select(SUBJECT, TARGET, BIN, ECCENTRICITY) %>%
     group_by(BIN, SUBJECT) %>%
     summarize(n()) %>% 
     arrange(SUBJECT) %>%
     data.frame
-}
-
-#' Estimate psychometric functions from the human responses.
-get_human_psychometric_params <- function(human_responses) {
-    library(bbmle)
-    library(parallel)
-  
-    # Remove replicated rows
-    human_responses <- human_responses[, setdiff(names(human_responses), 
-        c("L", "C", "S", "statType", "statValue"))] %>%
-      distinct()
-    
-    # Likelihood function.
-    f <- function(d0, e0, b, g) {
-        likelihood <- sum(log(pnorm(0.5 * d0 * (e0^b)/(e0^b + 
-            hit_vec^b) - g))) + sum(log(pnorm(-0.5 * d0 * (e0^b)/(e0^b + 
-            fa_vec^b) - g))) + sum(log(pnorm(-0.5 * d0 * (e0^b)/(e0^b + 
-            miss_vec^b) + g))) + sum(log(pnorm(0.5 * d0 * (e0^b)/(e0^b + 
-            cr_vec^b) + g)))
-        
-        
-        nll <- -likelihood
-        
-        if (is.infinite(nll)) {
-            return(10000)
-        } else {
-            return(nll)
-        }
-        
-    }
-    
-    get_params <- function(human_response_condition) {
-        hit_vec <- human_response_condition[human_response_condition$HIT == 
-            1, "ECCENTRICITY"]
-        fa_vec <- human_response_condition[human_response_condition$FALSEALARM == 
-            1, "ECCENTRICITY"]
-        cr_vec <- human_response_condition[human_response_condition$CORRECTREJECTION == 
-            1, "ECCENTRICITY"]
-        miss_vec <- human_response_condition[human_response_condition$MISS == 
-            1, "ECCENTRICITY"]
-        
-        environment(f) <- environment()
-        return(f)
-        
-    }
-    
-    human_response_list <- human_responses %>% 
-      group_by(TARGET, 
-        BIN, SUBJECT) %>% do(vals = data.frame(.)) %>% 
-      select(vals) %>% 
-        as.list()
-    human_response_list <- human_response_list[[1]]
-    
-    fcn_vec <- lapply(human_response_list, FUN = function(x) get_params(x))
-    
-    start_params <- expand.grid(d0 = 4.5, e0 = seq(1, 20, 0.5), 
-        b = seq(0, 5, 0.5), g = seq(-2, 2, 0.2))
-    n_search <- nrow(start_params)
-    
-    # Grid search for best starting parameters
-    grid_params <- lapply(fcn_vec, FUN = function(x) cbind(start_params, 
-        nll = unlist(mclapply(1:n_search, FUN = function(y) x(d0 = start_params[y, 
-            1], e0 = start_params[y, 2], b = start_params[y, 
-            3], g = start_params[y, 4]), mc.cores = 16))) %>% 
-        filter(nll == min(nll)))
-    
-    start_params <- do.call(rbind, grid_params)
-    subject_df <- lapply(human_response_list, FUN = function(x) x[1, 
-        c("TARGET", "BIN", "SUBJECT")]) %>% do.call(rbind, .)
-    
-    # ---
-    # Step 1.    
-    # Maximum likelihood for parameters, all parameters free to
-    # vary.
-    p.1 <- mclapply(1:length(fcn_vec), FUN = function(x) {
-        y <- start_params[x, ]
-        mle2(fcn_vec[[x]], start = list(e0 = y$e0, b = y$b, g = y$g), 
-            fixed = list(d0 = 4.5)) %>% coef
-    }, mc.cores = 16) %>% do.call(rbind, .) %>% data.frame %>% 
-        cbind(subject_df, .)  # 
-    
-    # --- 
-    # Step 2.
-    p.1 <- p.1 %>% group_by(SUBJECT) %>% mutate(b = mean(b))
-    
-    # Maximum likelihood for parameters, only e0 can vary.  b
-    # fixed at the mean.
-    p.2 <- mclapply(1:length(fcn_vec), FUN = function(x) {
-        y <- p.1[x, ]
-        mle2(fcn_vec[[x]], start = list(e0 = y$e0, g = y$g), 
-            fixed = list(d0 = 4.5, b = y$b)) %>% coef
-    }, mc.cores = 16) %>% do.call(rbind, .) %>%
-      data.frame %>% 
-        cbind(subject_df, .)
-    
-    # ---
-    # Step 3.
-    # All parameters fixed, but beta varies.
-    p.3 <- mclapply(1:length(fcn_vec), FUN = function(x) {
-        y <- p.2[x, ]
-        mle2(fcn_vec[[x]], start = list(b = y$b), fixed = list(d0 = 4.5, 
-            e0 = y$e0, g = y$g)) %>% coef
-    }, mc.cores = 16) %>% do.call(rbind, .) %>% data.frame %>% 
-        cbind(subject_df, .)
-    
-    # ---
-    # Step 4.
-    p.3 <- p.3 %>%
-      group_by(SUBJECT) %>%
-      mutate(b = mean(b))
-    
-    # All parameters vary, beta fixed at the mean.
-    p.4 <- mclapply(1:length(fcn_vec), FUN = function(x) {
-        y <- p.3[x, ]
-        mle2(fcn_vec[[x]], start = list(e0 = y$e0, g = y$g), 
-            fixed = list(d0 = 4.5, b = y$b)) %>% coef
-    }, mc.cores = 16) %>% do.call(rbind, .) %>%
-      data.frame %>% 
-        cbind(subject_df, .)
-    
-    # --- 
-    # Step 5.
-    # Return final model.
-    fitted.params <- p.4
-    return(fitted.params)
 }
 
 #' Bootstrap thresholds for human psychometric functions.
@@ -297,44 +191,153 @@ bootstrap_thresholds_human <- function(human_responses) {
 
 #' Add thresholds to a dataframe that contains psychometric parameters
 get_threshold <- function(psychometric_parameters) {
-    p.1 <- psychometric_parameters %>% 
+    thresholds <- psychometric_parameters %>% 
       rowwise() %>% 
       mutate(threshold = ((d0 * 
         e0^b)/1 - e0^b)^(1/b))
+    
+    return(thresholds)
+}
+
+get_new_human_psychometrics.2 <- function(human.responses) {
+  library(bbmle)
+  library(dplyr)
+  library(multidplyr)
+  
+  human.detect <- get_human_detect(human.responses)
+  
+  wrap_data <- function(human.data) {
+    NLL <- function(b, e0) {
+      library(dplyr)
+      d0 <- 4.5
+      print(b)
+      FA <- human.data %>% 
+        filter(FALSEALARM == 1) %>%
+        select(ECCENTRICITY) %>%
+        unlist() %>%
+        as.numeric()
+      
+      MISS <- human.data %>% 
+        filter(MISS == 1) %>%
+        select(ECCENTRICITY) %>%
+        unlist() %>%
+        as.numeric()
+      
+      CR <- human.data %>% 
+        filter(CORRECTREJECTION == 1) %>%
+        select(ECCENTRICITY) %>%
+        unlist() %>%
+        as.numeric()
+      
+      HIT <- human.data %>%
+        filter(HIT == 1) %>%
+        select(ECCENTRICITY) %>%
+        unlist() %>%
+        as.numeric()
+      
+      nll.hit <- sum(-pnorm(d0/2 * e0^b/(e0^b + HIT^b), log = T))
+      nll.fa <- sum(-pnorm(-d0/2 * e0^b/(e0^b + FA^b), log = T))
+      nll.cr <- sum(-pnorm(d0/2 * e0^b/(e0^b + CR^b), log = T))
+      nll.miss <- sum(-pnorm(-d0/2 * e0^b/(e0^b + MISS^b), log = T))
+      
+      return(nll.hit + nll.fa + nll.cr + nll.miss)
+    }    
+  }
+  
+  cluster <- create_cluster(cores = 16)
+  set_default_cluster(cluster)
+  cluster_assign_value(cluster, 'mle2', mle2)
+  cluster_assign_value(cluster, 'wrap_data', wrap_data)
+  
+  fit.dat <- human.responses %>%
+    select(TARGET, BIN, SUBJECT, TRIAL, SESSION, ECCENTRICITY, HIT, FALSEALARM, CORRECTREJECTION, MISS, CORRECT) %>%
+    unique() %>%
+    filter(!SUBJECT == "sps")
+  
+  fitted.models.full <- fit.dat %>% 
+    partition(TARGET, BIN, SUBJECT) %>% 
+    do(models = mle2(wrap_data(.), start = list(b = 4, e0 = 5), lower = c(b = .001, e0 = .5), upper = c(b = 20, e0 = 30), method = "L-BFGS-B")) %>%
+    collect() %>%
+    arrange(TARGET, BIN, SUBJECT)
+  
+  all.params.full <- data.frame(do.call(rbind, lapply(fitted.models.full$models, coef))) %>%
+    mutate(d0 = 6.25)
+  
+  all.params.full <- fitted.models.full %>% 
+    select(TARGET, BIN, SUBJECT) %>% 
+    data.frame %>%
+    cbind(., all.params.full) %>%
+    arrange(TARGET, BIN, SUBJECT) %>%
+    group_by(SUBJECT) %>%
+    mutate(mean_b = mean(b), mean_e0 = mean(e0))
+  
+  fit.dat.fixedb <- all.params.full %>%
+    select(SUBJECT, BIN, TARGET, mean_b, mean_e0, e0) %>%
+    unique %>%
+    merge(fit.dat, .)
+  
+  fitted.models.fixedb <- fit.dat.fixedb %>%
+    partition(TARGET, BIN, SUBJECT) %>% 
+    do(models = mle2(wrap_data(.), start = list(e0 = .$e0[[1]]), lower = c(e0 = .5), upper = c(e0 = 30), fixed = list(b = .$mean_b[[1]]), method = "L-BFGS-B")) %>%
+    collect() %>%
+    arrange(TARGET, BIN, SUBJECT)
+  
+  all.params.fixedb <- data.frame(do.call(rbind, lapply(fitted.models.fixedb$models, coef))) %>%
+    mutate(d0 = 6)
+  
+  all.params.fixedb <- fitted.models.fixedb %>% 
+    select(TARGET, BIN, SUBJECT) %>% 
+    data.frame %>%
+    cbind(., all.params.fixedb) %>%
+    arrange(TARGET, BIN, SUBJECT)
+  
+  lapply(1:15, FUN = function(x) plot_single_psychometric(all.params.fixedb, human.detect, x, 'vertical'))
+  
+  return(all.params.fixedb)
+    
 }
 
 plot_publication_thresholds <- function(human.thresholds, model.thresholds, 
-    out_path = "~/Dropbox/Calen/Dropbox/tmp_images/", statIn = "Lvals") {
+    out_path = "~/Dropbox/Calen/Dropbox/", statIn = "Lvals") {
     library(ggthemes)
     
-    human.threshold.1 <- human.thresholds %>% group_by(TARGET, 
-        BIN) %>% summarize(threshold = mean(threshold)) %>% mutate(SUBJECT = "human") %>% 
+    human.threshold.1 <- human.thresholds %>% 
+      group_by(TARGET, BIN, SUBJECT) %>% 
+      summarize(threshold = mean(threshold)) %>%
+      select(TARGET, BIN, threshold, SUBJECT) %>%
         data.frame
     
-    model.threshold.1 <- model.thresholds %>% select(TARGET, 
-        BIN, threshold, SUBJECT, -function_name) %>% data.frame
+    model.threshold.1 <- model.thresholds %>% 
+      select(TARGET, BIN, threshold, SUBJECT) %>%
+      data.frame
     
     threshold_values <- rbind(model.threshold.1, human.threshold.1) %>% 
         data.frame
     
     bin_values <- get_experiment_bin_values()
-    d.1 <- merge(threshold_values, bin_values) %>% group_by(TARGET, 
-        BIN, statValue, statType, SUBJECT) %>% summarize(threshold = mean(threshold)) %>% 
+    d.1 <- merge(threshold_values, bin_values) %>%
+      group_by(TARGET, BIN, statValue, statType, SUBJECT) %>%
+      summarize(threshold = mean(threshold)) %>% 
         filter(statType == statIn)
     
     
     t.1.plot <- ggplot(data = d.1, aes(x = statValue, y = threshold, 
-        colour = SUBJECT)) + geom_point() + geom_line() + facet_grid(~TARGET) + 
-        theme_light() + theme(aspect.ratio = 1) + ylab("Eccentricity Threshold")
+        colour = SUBJECT)) + 
+      geom_point() + 
+      geom_line() + 
+      facet_wrap(~TARGET, scales = "free_y") + 
+      theme_light() + 
+      theme(aspect.ratio = 1) + 
+      ylab("Eccentricity Threshold")
     
     if (statIn == "Lvals") {
-        t.1.plot <- t.1.plot + ylim(0, 25) + expand_limits(x = 0, 
+        t.1.plot <- t.1.plot + expand_limits(x = 0, 
             y = 1) + xlab("Background Luminance")
     } else if (statIn == "Cvals") {
-        t.1.plot <- t.1.plot + ylim(0, 25) + expand_limits(x = 0, 
+        t.1.plot <- t.1.plot + expand_limits(x = 0, 
             y = 1) + xlab("Background Contrast")
     } else if (statIn == "Svals") {
-        t.1.plot <- t.1.plot + ylim(0, 25) + xlim(0.4, 0.9) + 
+        t.1.plot <- t.1.plot + xlim(0.4, 0.9) + 
             expand_limits(x = 0, y = 0.9) + xlab("Background Similarity")
     }
     

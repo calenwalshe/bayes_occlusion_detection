@@ -1,71 +1,17 @@
 #' Compute mean vector and covariance matrices for all conditions in the experiment.
 save_gaussian_distributions <- function(template_response) {
-    template_response[, c("statType", "statValue", "L", "C", 
-        "S")] <- NULL
-    
-    f <- function(x) {
-        model_distribution <- template_response %>% unique() %>% 
-            filter(eccentricity == x) %>% dplyr::select(eccentricity, 
-            BIN, function_name, SAMPLE, TARGET, TPRESENT, TRESP) %>% 
-            mutate(TARGET = factor(TARGET, levels = c("vertical", 
-                "horizontal", "bowtie", "spot"))) %>% arrange(SAMPLE, 
-            TARGET, BIN, eccentricity, TPRESENT, function_name) %>% 
-            group_by(BIN, TARGET, eccentricity, function_name, 
-                TPRESENT) %>% spread(function_name, TRESP) %>% 
-            summarize(edge_mean = mean(edge_cos), lum_mean = mean(mean_only), 
-                pattern_mean = mean(pattern_only), edge_sd = sd(edge_cos), 
-                lum_sd = sd(mean_only), pattern_sd = sd(pattern_only), 
-                edge_lum_cor = cor(edge_cos, mean_only), edge_pattern_cor = cor(edge_cos, 
-                  pattern_only), lum_pattern_cor = cor(mean_only, 
-                  pattern_only)) %>% rowwise() %>% mutate(cor_mat = list(matrix(c(1, 
-            edge_lum_cor, edge_pattern_cor, edge_lum_cor, 1, 
-            lum_pattern_cor, edge_pattern_cor, lum_pattern_cor, 
-            1), nrow = 3, ncol = 3)), mean_mat = list(c(edge_mean, 
-            lum_mean, pattern_mean)), sd_mat = list(c(edge_sd, 
-            lum_sd, pattern_sd))) %>% arrange(BIN, TARGET, TPRESENT, 
-            eccentricity) %>% mutate(TARGET = factor(TARGET)) %>% 
-            dplyr::select(BIN, TARGET, eccentricity, TPRESENT, 
-                cor_mat, sd_mat, mean_mat)
-    }
-    
-    g <- function(x) {
-        model_responses <- template_response %>% unique() %>% 
-            filter(eccentricity == x) %>% dplyr::select(eccentricity, 
-            BIN, function_name, SAMPLE, TARGET, TPRESENT, TRESP) %>% 
-            mutate(TARGET = factor(TARGET, levels = c("vertical", 
-                "horizontal", "bowtie", "spot"))) %>% mutate(TPRESENT = ifelse(TPRESENT == 
-            "absent", 0, 1)) %>% dplyr::select(SAMPLE, BIN, TPRESENT, 
-            TARGET, function_name, eccentricity, TRESP) %>% unique() %>% 
-            spread(function_name, TRESP) %>% rowwise() %>% mutate(response_vec = list(c(edge_cos, 
-            mean_only, pattern_only))) %>% mutate(TARGET = factor(TARGET)) %>% 
-            dplyr::select(SAMPLE, BIN, TPRESENT, TARGET, response_vec)
-    }
-    
-    mclapply(unique(template_response$eccentricity), FUN = function(x) {
-        model_distribution <- f(x)
-        save(file = paste0("~/Dropbox/Calen/Work/data_storage/eccentricity_project/model_distribution_", 
-            as.character(floor(x)), ".rdata"), model_distribution)
-    }, mc.cores = 16)
-    
-    mclapply(unique(template_response$eccentricity), FUN = function(x) {
-        model_responses <- g(x)
-        save(file = paste0("~/Dropbox/Calen/Work/data_storage/eccentricity_project/model_responses_", 
-            as.character(floor(x)), ".rdata"), model_responses)
-    }, mc.cores = 16)
-}
-
-#' Compute mean vector and covariance matrices for all conditions in the experiment.
-save_gaussian_distributions.2 <- function(template_response) {
   library(dplyr)
   library(parallel)
   library(tidyr)
+  library(mvtnorm)
   template_response[, c("statType", "statValue", "L", "C", 
                         "S")] <- NULL
   
   f <- function(x) {
-    model_statistics <- template_response %>% unique() %>% 
-      filter(eccentricity == x) %>% dplyr::select(eccentricity, 
-                                                  BIN, function_name, SAMPLE, TARGET, TPRESENT, TRESP) %>% 
+    model_statistics <- template_response %>% 
+      unique() %>% 
+      filter(eccentricity == x) %>%
+      dplyr::select(eccentricity, BIN, function_name, SAMPLE, TARGET, TPRESENT, TRESP) %>% 
       mutate(TARGET = factor(TARGET, levels = c("vertical", "horizontal", "bowtie", "spot"))) %>% 
       arrange(SAMPLE, TARGET, BIN, eccentricity, TPRESENT, function_name) %>% 
       group_by(BIN, TARGET, eccentricity, function_name, TPRESENT) %>%
@@ -78,37 +24,54 @@ save_gaussian_distributions.2 <- function(template_response) {
                 pattern_sd = sd(pattern_only), 
                 edge_lum_cor = cor(edge_cos, mean_only),
                 edge_pattern_cor = cor(edge_cos, pattern_only),
-                lum_pattern_cor = cor(mean_only, pattern_only)) %>% 
+                lum_pattern_cor = cor(mean_only, pattern_only),
+                cor_mat = list(cor(as.matrix(data.frame(edge_cos, mean_only, pattern_only)))),
+                cov_mat = list(cov(as.matrix(data.frame(edge_cos, mean_only, pattern_only)))),
+                inv_cov_mat = list(solve(cov_mat[[1]]))) %>%
       rowwise() %>% 
-      mutate(cor_mat = 
-               list(matrix(c(1, edge_lum_cor, edge_pattern_cor, edge_lum_cor, 1, lum_pattern_cor, edge_pattern_cor, lum_pattern_cor, 1), nrow = 3, ncol = 3)), 
-             mean_mat = list(c(edge_mean, lum_mean, pattern_mean)), 
-             sd_mat = list(c(edge_sd, lum_sd, pattern_sd))) %>%
+      mutate(mean_vec = list(c(edge_mean, lum_mean, pattern_mean)), 
+             sd_vec   = list(sqrt(diag(cov_mat))),
+             var_vec  = list(diag(cov_mat)),
+             cor_vec  = list(cor_mat[upper.tri(cor_mat)]),
+             cov_vec  = list(cov_mat[upper.tri(cor_mat)])) %>%
       arrange(BIN, TARGET, TPRESENT, eccentricity) %>%
       mutate(TARGET = factor(TARGET)) %>% 
-      dplyr::select(BIN, TARGET, eccentricity, TPRESENT, cor_mat, sd_mat, mean_mat)
+      dplyr::select(BIN, TARGET, eccentricity, TPRESENT, cor_mat, cov_mat, inv_cov_mat, sd_vec, mean_vec, sd_vec, var_vec, cor_vec, cov_vec)
   }
   
   g <- function(x) {
-    model_responses <- template_response %>% unique() %>% 
+    model_responses <- template_response %>% 
+      unique() %>% 
       filter(eccentricity == x) %>% 
-      dplyr::select(eccentricity, BIN, function_name, SAMPLE, TARGET, TPRESENT, TRESP) %>% 
+      select(eccentricity, BIN, function_name, SAMPLE, TARGET, TPRESENT, TRESP) %>% 
       spread(function_name, TRESP) %>%      
       mutate(TARGET = factor(TARGET, levels = c("vertical", "horizontal", "bowtie", "spot"))) %>% 
       group_by(BIN, TARGET, eccentricity, TPRESENT) %>%      
-      summarize(response_vec = list(data.frame(edge = edge_cos, mean = mean_only, pattern = pattern_only))) %>% 
-      dplyr::select(BIN, TARGET, eccentricity, TPRESENT, response_vec) 
+      summarize(response_vec = list(as.matrix(data.frame(edge = edge_cos, mean = mean_only, pattern = pattern_only)))) %>% 
+      select(BIN, TARGET, eccentricity, TPRESENT, response_vec) 
   }
   
-  mclapply(unique(template_response$eccentricity), FUN = 
-             function(x) {
-    model.stats <- f(x)
-    model.responses <- g(x)
-    model.stats$response_vec <- model.responses$response_vec
-    model.data <- model.stats %>% 
-      arrange(TARGET, eccentricity, BIN, TPRESENT) %>% 
-      mutate(TPRESENT = ifelse(TPRESENT == "absent", 0, 1))
-    save(file = paste0("~/Dropbox/Calen/Work/data_storage/eccentricity_project/model_distribution_", as.character(floor(x)), ".rdata"), model.data)
-    }, 
-  mc.cores = 16)
-}
+  model.data.all <- mclapply(unique(template_response$eccentricity), FUN = 
+                               function(x) {
+                                 model.stats <- f(x)
+                                 model.responses <- g(x)
+                                 model.stats$response_vec <- model.responses$response_vec
+                                 model.data <- model.stats %>% 
+                                   arrange(TARGET, eccentricity, BIN, TPRESENT) %>% 
+                                   mutate(TPRESENT = ifelse(TPRESENT == "absent", 0, 1))
+                                 
+                                 save(file = paste0("~/Dropbox/Calen/Work/data_storage/eccentricity_project/model_distribution_", as.character(floor(x)), ".rdata"), model.data)
+                                 return(model.data)
+                               }, 
+                             mc.cores = 16)
+  
+  model.data.all <- do.call(rbind, model.data.all)
+  
+  model.wide <- model.data.all %>%
+    gather(mat_type, value, -(BIN:TPRESENT)) %>% 
+    unite(data, mat_type, TPRESENT) %>%
+    spread(data, value, sep = '_')
+  
+  save(file = paste0("~/Dropbox/Calen/Work/data_storage/eccentricity_project/model_distribution_all.rdata"), model.data.all)
+  save(file = paste0("~/Dropbox/Calen/Work/data_storage/eccentricity_project/model_wide.rdata"), model.wide)
+  }

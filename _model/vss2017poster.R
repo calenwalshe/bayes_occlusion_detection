@@ -16,7 +16,5 @@ plot_vss_psychometrics <- function(psychometric_parameters, performance_measures
     p <- ggplot(responses, aes(x = eccentricity, y = pc, colour = SUBJECT)) + geom_line() + geom_point(data = sub_response, aes(x = eccentricity, y = percent_correct), size = 2) + scale_y_continuous(limits = c(0.4, 1)) + facet_wrap(~TARGET, ncol = 2) + theme_light() + 
         theme(legend.title = element_blank(), strip.text.x = element_text(size = 20), aspect.ratio = 1, axis.title = element_text(size = 20), axis.text = element_text(size = 17), legend.text = element_text(size = 20)) + ylab("Percent Correct") + xlab("Eccentricity")
     
-    ggsave(last_plot(), file = paste0("~/Dropbox/Calen/Dropbox/tmp_images/vss_psychometrics.pdf"))
-    
-    
+    ggsave(last_plot(), file = paste0("~/Dropbox/Calen/Dropbox/vss_psychometrics.pdf"))
 }

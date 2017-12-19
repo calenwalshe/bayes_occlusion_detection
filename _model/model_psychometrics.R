@@ -13,7 +13,6 @@ get_model_psychometric <- function(model.dprime, scale.dprime = 1) {
   
   fitted <- model.dprime %>% 
     as_tibble() %>%
-    filter(!eccentricity == 0) %>%
     group_by(BIN, TARGET, SUBJECT) %>%
     arrange(eccentricity) %>%
     mutate(d0 = max(dprime)) %>%

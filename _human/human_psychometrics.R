@@ -12,9 +12,9 @@ get_human_responses <-
                                                         "yhb"), TRIAL != 1) %>%
       rename(BIN = BINS)
     
-    human_data <- human_data %>% group_by(SUBJECT, BIN, TARGET) %>%
-      mutate(n_ecc = length(unique((ECCENTRICITY)))) %>% filter(!(SESSION ==
-                                                                    2 & n_ecc > 5))
+    #human_data <- human_data %>% group_by(SUBJECT, BIN, TARGET) %>%
+    #  mutate(n_ecc = length(unique((ECCENTRICITY)))) %>% filter(!(SESSION ==
+    #                                                                2 & n_ecc > 5))
     
     human_data$CORRECT <-
       ifelse(human_data$HIT == 1 | human_data$CORRECTREJECTION ==
@@ -163,7 +163,7 @@ plot_publication_thresholds <-
     
     t.1.plot <-
       ggplot(data = d.1, aes(x = statValue, y = threshold,
-                             colour = SUBJECT)) +
+                             colour = SUBJECT, group = SUBJECT)) +
       geom_point() +
       geom_line() +
       facet_wrap( ~ TARGET) +

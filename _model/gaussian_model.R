@@ -1,4 +1,5 @@
-get_scaled_model <- function(model.wide, scale.val = 1) {
+# Compute performance of the Bayes' optimal detector
+get_optimal_model <- function(model.wide) {
   library(dplyr)
   library(broom)
   library(bbmle)
@@ -35,7 +36,6 @@ get_scaled_model <- function(model.wide, scale.val = 1) {
     
   cluster <- create_cluster(cores = 16)
   cluster_assign_value(cluster, 'integrate_distribution', integrate_distribution)
-  cluster_assign_value(cluster, 'integrate.3', integrate.3)
   cluster_library(cluster, 'bbmle')
   cluster_library(cluster, 'purrr')
   cluster_library(cluster, 'R2Cuba')
@@ -81,6 +81,26 @@ get_scaled_model <- function(model.wide, scale.val = 1) {
   return(integrate.result)
 }
 
+# Compute the model based on dprime summation with assumptions of independence and equal variance.
+get_independent_model <- function(model.wide) {
+  optimal.df <- model.wide %>%
+    select(BIN, TARGET, eccentricity, data_mean_vec_0, data_mean_vec_1, data_sd_vec_0, data_sd_vec_1)
+  
+  optimal.dprime <- by_row(optimal.df, function(row) {
+    dprime <- sqrt(
+      sum(
+        (
+          abs(row$data_mean_vec_1[[1]] - row$data_mean_vec_0[[1]]) /
+            sqrt(row$data_sd_vec_0[[1]]^2 + row$data_sd_vec_1[[1]]^2)
+          )^2
+        )) # sqrt sum dprime^2
+  }, .collate = "row", .to = "dprime")
+  
+  optimal.dprime$SUBJECT <- "independent_cue"
+  
+  return(optimal.dprime)
+}
+
 #' Computes a negative log likelihood.
 get_NLL <- function(ECC, template_response, human_pc_exp) {
   f <- get_model_results(ECC, template_response, human_pc_exp)
@@ -93,4 +113,33 @@ get_NLL <- function(ECC, template_response, human_pc_exp) {
     NLL_val <- sum(model_response$NLL)
     return(NLL_val)
   }
+}
+
+#' Compute the efficiency of the optimal and human responses
+get_efficiency <- function(human.psychometric, optimal.observer) {
+  library(purrrlyr)
+  
+  model.dat <- optimal.observer %>%
+    select(SUBJECT, BIN, TARGET, eccentricity, dprime)
+  
+  human.dat <- human.psychometric %>%
+    select(SUBJECT, BIN, TARGET, d0, e0, b, gamma) %>%
+    mutate(e0 = as.numeric(e0))
+  
+  optim.human.dat <- merge(model.dat, human.dat, by = c("TARGET", "BIN"))
+  
+  efficiency <- by_row(optim.human.dat, function(row) {
+    e0  <- row$e0
+    b   <- row$b
+    d0  <- row$d0
+    ecc <- row$eccentricity
+    
+    dprime.human <- d0 * e0^b/(e0^b + ecc^b)
+  }, .to = "dprime.human") %>%
+    unnest(dprime.human) %>%
+    mutate(efficiency = dprime.human/dprime) %>%
+    select(BIN, TARGET, eccentricity, efficiency) %>%
+    arrange(BIN, TARGET, eccentricity)
+  
+  return(efficiency)
 }

@@ -1,291 +1,243 @@
 # Import the template response data from disk.
-import_template_stats <- function(file_path = '~/Dropbox/Calen/Dropbox/') {
-  
-  template.sigma  <- read.table(paste0(file_path, 'tMatch_sigma.txt'), header = T, sep = '\t') %>% 
-    mutate(type = "sigma")
-  template.mean   <- read.table(paste0(file_path, 'tMatch_mean.txt'), header = T, sep = '\t') %>% 
-    mutate(type = "mean")
-  
-  template.stats     <- rbind(template.sigma, template.mean) %>% 
-    spread(type, tSigma) %>%
-    mutate(PRESENT = 0)
-  
-  template.stats$TARGET <- factor(template.stats$TARGET, labels = c("vertical", "horizontal", "bowtie", "spot"))
-  
-  bin.values        <- get_bin_values() %>%
-    mutate(TARGET = TARGET_NAME, TARGET_NAME = NULL)
+# Description: A dataframe with sigma and mean responses for all
+# natural scene conditions.
+import_stats <- function(file_path = '~/Dropbox/Calen/Dropbox/') {
+  library(dplyr, quietly = TRUE)
+  library(purrrlyr, quietly = TRUE)
+  library(purrr, quietly = TRUE)
+  library(tidyr, quietly = TRUE)
 
-  template.stats     <- template.stats %>%
-    merge(., bin.values)
+  files <- list.files(paste0(file_path), full.names = T, recursive = F)
+  files <- files[grepl('txt', files)]
   
-  return(template.stats)
+  ecc_deg = c(0.000000, 1.381106, 4.621447, 11.509662, 23.099524)
+  
+  scene_stats <- lapply(files, FUN = function(x) read.table(x, header = T, sep = "\t"))
+  
+  
+  scene_stats_all <- do.call(rbind, scene_stats) %>%
+    rename(response = tSigma)
+  
+  scene_stats_all$TARGET <- factor(scene_stats_all$TARGET, labels = c("vertical", "horizontal", "bowtie", "spot")) # create text labels for factors
+
+  bin_values <- get_bin_values() %>%
+    select(-TARGET) %>%
+    dplyr::rename(TARGET = TARGET_NAME)
+  
+  response_stats     <- scene_stats_all %>%
+    merge(., bin_values) %>%
+    arrange(TARGET, Lvals, Cvals, Svals)
+  
+  response_stats <- by_row(response_stats, function(x) {
+    ecc_deg[x$eccentricity]
+  }, .to = "ecc_deg") %>%
+    unnest(ecc_deg)
+  
+  return(response_stats)
 }
 
-# Import the template response data from disk.
-import_luminance_stats <- function(file_path = '~/Dropbox/Calen/Dropbox/') {
-  
-  luminance.sigma  <- read.table(paste0(file_path, 'L_sigma.txt'), header = T, sep = '\t') %>% 
-    mutate(type = "sigma")
-  luminance.mean   <- read.table(paste0(file_path, 'L_mean.txt'), header = T, sep = '\t') %>% 
-    mutate(type = "mean")
-  
-  luminance.stats     <- rbind(luminance.sigma, luminance.mean) %>% 
-    spread(type, tSigma) %>%
-    mutate(PRESENT = 0)
-  
-  luminance.stats$TARGET <- factor(luminance.stats$TARGET, labels = c("vertical", "horizontal", "bowtie", "spot"))
-  
-  bin.values        <- get_bin_values() %>%
-    mutate(TARGET = TARGET_NAME, TARGET_NAME = NULL)
-  
-  luminance.stats     <- luminance.stats %>%
-    merge(., bin.values)
-  
-  return(luminance.stats)
-}
-
-# Import the edge response data from disk.
-import_edge_stats <- function(file_path = '~/Dropbox/Calen/Dropbox/') {
-  
-  edge.sigma  <- read.table(paste0(file_path, 'Eabs_sigma.txt'), header = T, sep = '\t') %>% 
-    mutate(type = "sigma")
-  edge.mean   <- read.table(paste0(file_path, 'Eabs_mean.txt'), header = T, sep = '\t') %>% 
-    mutate(type = "mean")
-  
-  edge.stats     <- rbind(edge.sigma, edge.mean) %>% 
-    spread(type, tSigma) %>%
-    mutate(PRESENT = 0)
-  
-  edge.stats$TARGET <- factor(edge.stats$TARGET, labels = c("vertical", "horizontal", "bowtie", "spot"))
-  
-  bin.values        <- get_bin_values() %>%
-    mutate(TARGET = TARGET_NAME, TARGET_NAME = NULL)
-  
-  edge.stats     <- edge.stats %>%
-    merge(., bin.values)
-  
-  return(edge.stats)
-}
-
-# Compute and save the edge standard deviations.
-edge_stat <- function(statType = 'Eabs', target = 'vertical') {
+# Generate figures with the standard deviations of the response statistics
+plot_response_sigma <- function(response_stats.df) {
   library(dplyr)
+  library(tidyr)
   library(ggplot2)
+  library(purrrlyr)
   
-  edge.stats <- import_edge_stats() %>%
-    filter(TARGET == target)
   
-  edge.all       <- edge.stats %>%
-    group_by(L,C,S,PYRAMIDLVL,TARGET) %>%
-    arrange(L,C,S,TARGET, PRESENT)
+  fig_stats <- response_stats.df %>% 
+    group_by(response_type, statistic, eccentricity) %>%
+    nest()
   
-  #template.stats$Cvals <- as.factor(template.stats$Cvals)
-  edge.all$Svals <- as.factor(edge.all$Svals)
-  
-  fig <- ggplot(data = edge.all, aes(x = Svals, y = sigma, shape = TARGET, colour = as.factor(Cvals))) +
-    geom_point() + 
-    facet_wrap(~Lvals, ncol = 3) +
-    theme(aspect.ratio = 1)# +
-    #scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/', target, '_', statType, '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig)
+  by_row(fig_stats, function(x) {
+    data <- x$data[[1]]
+    
+    ggplot(data, aes(x = Svals, y = response, colour = as.factor(Cvals))) +
+      geom_point() +
+      facet_wrap(Lvals~TARGET, scales = "free_y", ncol = 4) +
+      theme(aspect.ratio = 1)
+    
+    ggsave(filename = paste0('~/Dropbox/Calen/Dropbox/scene_statistics_figures/', x$eccentricity[[1]], '-', x$response_type[[1]], '-', x$statistic[[1]], '.pdf'), width = 30, height = 30)
+  })
 }
 
-# Compute and save the template response standard deviations.
-template_stat <- function(statType = 'tSigma', target = "vertical") {
+# Fit to Sebastian, 2016
+plot_sebastian_fit <- function(response_stats.df) {
+  # Load required libraries
+  library(bbmle, quietly = TRUE)
+  library(ggplot2, quietly = TRUE)
+  library(knitr, quietly = TRUE)
+  library(kableExtra, quietly = TRUE)
   
-  library(dplyr)
-  library(ggplot2)
+  # Filter statistics to contain approx. range used in the Sebastian 2016
+  scene.stats.pnas <- response_stats.df %>%
+    filter(Lvals < 60, Cvals < .30, Svals < .52) %>%
+    filter(!is.nan(response), statistic == "sigma", response_type == "tMatch")
   
-  template.stats <- import_template_stats() %>%
-    filter(TARGET == target)
-  
-  template.all       <- template.stats %>%
-    group_by(L,C,S,PYRAMIDLVL,TARGET) %>%
-    arrange(L,C,S,TARGET, PRESENT)
-  
-  #template.stats$Cvals <- as.factor(template.stats$Cvals)
-  template.all$Svals <- as.factor(template.all$Svals)
-  
-  fig <- ggplot(data = template.all, aes(x = Cvals, y = sigma, shape = TARGET, colour = Svals)) +
-    geom_point() + 
-    facet_wrap(~Lvals, ncol = 3, scales = "free_y") +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/', target, '_', statType, '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig)
-}
+  # Fit the separable model to the range ranges in Sebastian 2016.
+  stats.nested.pnas <- scene.stats.pnas %>%
+    group_by(TARGET) %>%
+    nest() %>%
+    mutate(models = map(data, function(x) {
+      m1 <- mle2(response ~ dnorm(mean = k0 * (I(Lvals) + a)*(I(Cvals) + b)*(I(Svals) + c), sd = 1),
+                 start = list(k0 = 0, a = 0,b = 0,c = 0),
+                 data = x)
+    })) %>%
+    mutate(prediction = map(models, predict)) 
 
-# Luminance statistics
-lum_stat <- function(statType = 'L', target = "vertical") {
-  library(dplyr)
-  library(ggplot2)
+  # Compute predictions for the data from the fitted model
+  stats.nested.pnas.prediction <- stats.nested.pnas %>%
+    unnest(data, prediction) %>%
+    gather(type, value, c("response", "prediction"))
   
-  template.stats <- import_luminance_stats() %>%
-    filter(TARGET == target)
+  # Extract parameters from fitted model.
+  stats.nested.pnas.parameters <- stats.nested.pnas %>%
+    mutate(parameters = map(models, . %>% coef %>% as.list() %>% as_tibble())) %>%
+    unnest(parameters)
   
-  template.all       <- template.stats %>%
-    group_by(L,C,S,PYRAMIDLVL,TARGET) %>%
-    arrange(L,C,S,TARGET, PRESENT)
+  # Print the model parameters to disk.
+  stats.nested.pnas.parameters %>% 
+    select(TARGET, k0, a, b, c) %>%
+    kable(format = 'latex') %>%
+    kable_as_image(filename = '~/Dropbox/Calen/Dropbox/fovea_parameters_pnas', file_format = 'png')  
   
-  #template.stats$Cvals <- as.factor(template.stats$Cvals)
-  template.all$Svals <- as.factor(template.all$Svals)
-  
-  fig <- ggplot(data = template.all, aes(x = Cvals, y = sigma, shape = TARGET, colour = Svals)) +
-    geom_point() + 
-    facet_wrap(~Lvals, ncol = 3) +
-    theme(aspect.ratio = 1) +
-    scale_color_brewer(palette="Spectral")
-  
-  ggsave(fig, file = paste0('~/Dropbox/Calen/Dropbox/', target, '_', statType, '.pdf'), width = 50, height = 50, units = "cm")
-  
-  plot(fig)
-}
-
-# Function edge_historgram
-# Description: Compute histograms of edge responses in bins. 
-edge_histogram <- function(target = 1) {
-  library(ggplot2)
-  library(dplyr)
-  
-  lum <- 5
-  
-  alledgeSigmaAbs <- read.table('~/Dropbox/Calen/Dropbox/Epres_AllResponse_mean.txt', header = T, sep = '\t') %>%
-    mutate(PRESENT = as.factor(0))
-  
-  edgeStatistics     <- alledgeSigmaAbs %>% 
-    filter(TARGET == target)
-  
-  fig_lum <- ggplot(data = edgeStatistics, aes(x = resp, colour = as.factor(lum))) +
-    geom_freqpoly() +
-    facet_wrap(~C, scale = "free_y") +
+  # Create figure with scene statistics and predictions.
+  pnas.range <- ggplot(stats.nested.pnas.prediction, aes(x = Svals, y = value, colour = as.factor(Cvals), shape = TARGET)) +
+    geom_point(data = . %>% filter(type == "response"), size = 5) +
+    geom_line(data = . %>% filter(type == "prediction")) +
+    facet_wrap(~Lvals, ncol= 4) +
+    theme_set(theme_gray(base_size = 30)) +
+    list(theme(legend.position = "bottom",
+               legend.title = element_text(size=20),
+               plot.title = element_text(size = 30),
+               axis.title = element_text(size=20),
+               axis.text = element_text(size=15),
+               legend.text = element_text(size=15))) +
     theme(aspect.ratio = 1)
   
-  fig_lum <- ggplot(data = edgeStatistics %>% filter(L == lum)
-                    , aes(x = resp, colour = as.factor(lum))) +
-    geom_histogram(binwidth = .01) +
-    facet_wrap(~C, scale = "free_y") + 
-    theme(aspect.ratio = 1)  
-  
-  ggsave(fig_lum, file = paste0('~/Dropbox/Calen/Dropbox/edge_stats/', 'edge_hist_', lum, target, '_', '.pdf'), width = 50, height = 50, units = "cm")
+  # Store a figure to disk. 
+  ggsave(filename = '~/Dropbox/Calen/Dropbox/pnas.range.pdf', width = 20, height = 20)
 }
 
 # Fit a function to the standard standard deviations of the template responses.
-fit.template.stats <- function(target) {
-  template.stats <- import_template_stats() %>%
-    filter(!is.nan(sigma)) %>%
-    filter(TARGET == target)
-
-  Lvals <- template.stats$Lvals 
-  Cvals <- template.stats$Cvals
-  Svals <- template.stats$Svals
-  
-  sigma <- template.stats$sigma
-
-  m1 <- mle2(sigma ~ dnorm(mean = k0 * (Lvals + a)*(I(Cvals) + b)*(I(Svals)^d + c), sd = 1),
-             start = list(k0 = 1, a = 0,b = 0,c = 0, d = 0),
-             data = data.frame(Lvals = Lvals, Cvals = Cvals, Svals = Svals, sigma = sigma))
-  
-  print((var(sigma) - var(residuals(m1)))/var(sigma))
-  
-  template.stats.predict       <- template.stats
-  template.stats.predict$sigma <- as.numeric(predict(m1))
-  
-  template.stats.predict       <- template.stats.predict %>%
-    group_by(L,C,S,PYRAMIDLVL,TARGET) %>%
-    arrange(L,C,S,TARGET, PRESENT)
-  
-  template.stats.predict$Svals <- as.numeric(template.stats.predict$Svals)
-  template.stats$Svals <- as.numeric(template.stats$Svals)
-  
-  # Plot Edge Statistic
-  
-  fig <- ggplot(data = template.stats, aes(x = Svals , y = (sigma), colour = as.factor(Cvals))) +
-    geom_point() + 
-    geom_line(data = template.stats.predict, aes(x = Svals, y = (sigma),  colour = as.factor(Cvals))) + 
-    facet_wrap(~Lvals, ncol = 3) +
-    theme(aspect.ratio = 1)# +
-  
-  plot(fig)
-  
-  ggsave(file = paste0('~/Dropbox/Calen/Dropbox/template_', target, '_separable.pdf'), fig, width = 40, height = 40)
-}
-
-# Fit a function to the standard deviation of the edge responses.
-fit.edge.stats <- function(target) {
+fit.template.stats <- function(scene_statistics, eccLvl = c(1,3)) {
   library(bbmle)
+  library(dplyr)
+  library(tidyr)
+  library(purrr)
+  library(ggplot2)
+  library(knitr)
+  library(kableExtra)
   
-  edge.stats <- import_edge_stats() %>%
-    filter(!is.nan(sigma)) %>%
-    filter(TARGET == target) %>%
-    group_by(Lvals, Cvals) %>%
-    summarize(sigma = mean(sigma))
+  # Filter data frame to contain relevant data
+  template.stats <- scene_statistics %>%
+    filter(eccentricity %in% eccLvl, response_type == "tMatch", statistic == "sigma", !is.nan(response)) %>%
+    group_by(TARGET, eccentricity, ecc_deg) %>%
+    nest()
     
+  # Fit model
+  m.1 <- template.stats %>% 
+    mutate(model = map(data, function(data) {
+      model <- mle2(response ~ dnorm(mean = k0 * (I(Lvals) + L_p)*(I(Cvals) + C_p)*(I(Svals) + S_p)^S_exp, sd = response),
+                    start = list(k0 = 0, L_p = 0,C_p = 0,S_p = 0, S_exp = 0),
+                    data = data)
+      })) %>%
+    mutate(prediction = map(model, predict))
   
-  Lvals <- edge.stats$Lvals 
-  Cvals <- edge.stats$Cvals
+  model.response <- m.1 %>% 
+    unnest(data, prediction) %>%
+    gather(response, value, prediction, response)
+
+  # Plot Template Response Statistics
   
-  sigma <- edge.stats$sigma
+  model.response %>%
+    group_by(ecc_deg) %>%
+    nest() %>%
+    mutate(fig.vis = map2(ecc_deg, data, function(ecc_arg, model_arg) {
+      fig.1 <- ggplot(data = model_arg, aes(x = Svals , y = value, colour = as.factor(Cvals), linetype = as.factor(response), shape = as.factor(response))) +
+        geom_point() +
+        geom_line() +
+        facet_wrap(Lvals ~ TARGET, ncol = 8, scale = "free") +
+        theme_bw(base_size = 30) +
+        theme(aspect.ratio = 1) +
+        list(theme(legend.title = element_text(size=40),
+                   plot.title = element_text(size = 40),
+                   axis.title = element_text(size=40),
+                   axis.text = element_text(size=25),
+                   legend.text = element_text(size=40)))
+      
   
-  m1 <- mle2(sigma ~ dnorm(mean = (a*Lvals) + (b*Cvals) + c*Lvals*Cvals, sd = 1),
-             start = list(a = 1,b = 1,c = 1),
-             data = data.frame(Lvals = Lvals, Cvals = Cvals, sigma = sigma))
+      ggsave(plot = fig.1, filename = paste0('~/Dropbox/Calen/Dropbox/template_sigma_', ecc_arg,'.pdf'), width = 40, height = 40)
+    }))
   
-  print((var(sigma) - var(residuals(m1)))/var(sigma))
+  fitted.params <- cbind(m.1[,1:3],data.frame(do.call(rbind, map(m.1$model, coef)))) 
   
-  edge.stats.predict       <- edge.stats
-  edge.stats.predict$sigma <- as.numeric(predict(m1))
+  fitted.params %>%
+    kable(format = 'latex') %>%
+    kable_as_image('~/Dropbox/Calen/Dropbox/template_sigma_params', file_format = 'pdf')
   
-    # Plot Edge Statistic
+  fitted.params.long <- fitted.params %>%
+    gather("param_label", "v", 4:8)
   
-  fig <- ggplot(data = edge.stats, aes(x = Cvals , y = sigma, colour = as.factor(Lvals))) +
+  fig.fitted <- ggplot(fitted.params.long, aes(x = ecc_deg, y = v, colour = TARGET)) + 
     geom_point() + 
-    geom_line(data = edge.stats.predict, aes(x = Cvals, y = sigma,  colour = as.factor(Lvals))) +
-    theme(aspect.ratio = 1)# +
+    geom_line() + 
+    facet_wrap(~param_label, scales = "free_y", nrow = 1) +
+    theme(aspect.ratio = 1) +
+    list(theme(legend.title = element_text(size=40),
+               plot.title = element_text(size = 40),
+               axis.title = element_text(size=40),
+               axis.text = element_text(size=25),
+               legend.text = element_text(size=40)))
   
-  plot(fig)
   
-  ggsave(file = paste0('~/Dropbox/Calen/Dropbox/edge_', target, '_separable.pdf'), fig, width = 40, height = 40)
+  ggsave(plot = fig.fitted, filename = paste0('~/Dropbox/Calen/Dropbox/template_stats_parameter_fig.pdf'), width = 40, height = 40)
+  
 }
 
-# Fit a function to the standard deviation of the luminance responses.
-fit.lum.stats <- function(target) {
+fit.edge.stats <- function(scene_statistics) {
   library(bbmle)
+  library(dplyr)
+  library(tidyr)
+  library(purrr)
+  library(ggplot2)
+  library(knitr)
+  library(kableExtra)
   
-  lum.stats <- import_luminance_stats() %>%
-    filter(!is.nan(sigma)) %>%
-    filter(TARGET == target) %>%
-    group_by(Lvals, Cvals) %>%
-    summarize(sigma = mean(sigma))
+  eccLvl <- 0
+  
+  edge.stats <- scene_statistics %>%
+    filter(eccentricity %in% eccLvl, response_type == "Eabs", statistic == "sigma", !is.nan(response)) %>%
+    group_by(TARGET, L, C, Lvals, Cvals) %>% 
+    summarize(response = mean(response)) %>%
+    group_by(TARGET) %>%
+    nest()
   
   
-  Lvals <- lum.stats$Lvals 
-  Cvals <- lum.stats$Cvals
+  m.1 <- edge.stats %>% 
+    mutate(model = map(data, function(data) {
+      model <- mle2(response ~ dnorm(mean = k0 * (I(Lvals) + b)^a*(I(Cvals) + d)^c, sd = response),
+                    start = list(k0 = 1,a = 1, b = 1,c = 1, d = 1),
+                    data = data)
+    })) %>%
+    mutate(prediction = map(model, predict))
   
-  sigma <- lum.stats$sigma
+  model.response <- m.1 %>% 
+    unnest(data, prediction) %>%
+    gather(response, value, prediction, response)
   
-  m1 <- mle2(sigma ~ dnorm(mean = (a*Lvals), sd = 1),
-             start = list(a = 1),
-             data = data.frame(Lvals = Lvals, Cvals = Cvals, sigma = sigma))
+  # Plot Edge Response Statistics
   
-  print((var(sigma) - var(residuals(m1)))/var(sigma))
+  fig.1 <- ggplot(data = model.response, aes(x = Cvals , y = value, linetype = as.factor(response), colour = as.factor(Lvals))) +
+    geom_point() +
+    geom_line() +
+    facet_wrap(~TARGET, ncol = 4) +
+    theme_bw(base_size = 30) + 
+    theme(aspect.ratio = 1)
   
-  lum.stats.predict       <- lum.stats
-  lum.stats.predict$sigma <- as.numeric(predict(m1))
+  ggsave(plot = fig.1, filename = paste0('~/Dropbox/Calen/Dropbox/edge_sigma.pdf'), width = 40, height = 40)
   
-  # Plot Edge Statistic
-  
-  fig <- ggplot(data = lum.stats, aes(x = Cvals , y = sigma, colour = as.factor(Lvals))) +
-    geom_point() + 
-    geom_line(data = lum.stats.predict, aes(x = Cvals, y = sigma,  colour = as.factor(Lvals))) +
-    theme(aspect.ratio = 1)# +
-  
-  plot(fig)
-  
-  ggsave(file = paste0('~/Dropbox/Calen/Dropbox/edge_', target, '_separable.pdf'), fig, width = 40, height = 40)
+  do.call(rbind, map(m.1$model, coef)) %>%
+    kable(format = 'latex') %>%
+    kable_as_image('~/Dropbox/Calen/Dropbox/edge_sigma_params', file_format = 'pdf')
 }
 

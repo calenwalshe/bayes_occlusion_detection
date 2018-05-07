@@ -28,7 +28,8 @@ get_model_psychometric <- function(model.dprime, scale.dprime = 1) {
   fitted.params <- fitted %>%
     mutate(params = map(models, coef), 
            b = map(params, c(1)),
-           e0 = map(params, c(2))) %>%
+           e0 = map(params, c(2)),
+           gamma = 0) %>%
     select(-models, -params) %>%
     unnest()
   

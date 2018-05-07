@@ -1,36 +1,3 @@
-plot_all_single_eccentricity <- function(human.psychometrics, 
-    model.dprime) {
-    
-    sub_params <- human.psychometrics
-    
-    sub_params <- merge(sub_params, data.frame(eccentricity = unique(model.dprime$eccentricity)))
-    
-    pc <- lapply(1:nrow(sub_params), FUN = function(x) pc = pnorm(sub_params[x, 
-        "d0"]/2 * (sub_params[x, "e0"]^sub_params[x, "b"])/(sub_params[x, 
-        "e0"]^sub_params[x, "b"] + sub_params[x, "eccentricity"]^sub_params[x, 
-        "b"]))) %>% do.call(rbind, .)
-    
-    sub_params$pc <- pc
-    
-    human_dat <- sub_params %>% group_by(TARGET, BIN, eccentricity) %>% 
-        summarize(pc = mean(pc)) %>% ungroup() %>% mutate(dprime = 2 * 
-        as.numeric(qnorm(pc)), SUBJECT = "human") %>% data.frame
-    
-    model_dat <- model.dprime %>% select(TARGET, BIN, 
-        eccentricity, percent_correct, dprime) %>% rowwise() %>% 
-        mutate(pc = percent_correct, dprime = 2 * as.numeric(qnorm(pc)), 
-            percent_correct = NULL, SUBJECT = "model") %>% data.frame
-    
-    dat <- rbind(human_dat, model_dat) %>% group_by(BIN, TARGET, 
-        eccentricity) %>% summarize(pc_diff = pc[1] - pc[2])
-    
-    fig <- ggplot(dat, aes(x = eccentricity, y = pc_diff)) + 
-        geom_point() + facet_grid(~TARGET)
-    
-    ggsave(last_plot(), file = "~/Dropbox/Calen/Dropbox/compare_pc.pdf")
-    print(1)
-}
-
 plot_model_cormat <- function(file_path = '~/Dropbox/Calen/Work/data_storage/eccentricity_project/') {
   
   f <- function(file_path) {
@@ -70,40 +37,57 @@ plot_model_cormat <- function(file_path = '~/Dropbox/Calen/Work/data_storage/ecc
                                   f(x), width = 40, height = 20, units = 'in'))
 }
 
-plot_histograms <- function(template.response) {
-  library(ggplot2)
+# Plot a figure with dprime for all measured conditions
+plot_dprime <- function(dprime.df) {
   library(dplyr)
-  lapply(unique(template.response$eccentricity), FUN = 
-           function(x) {
-             p1 <- ggplot(data = template.response %>% filter(eccentricity == x), aes(x = TRESP, fill = factor(TPRESENT))) + geom_histogram(binwidth = .00001) + facet_wrap(BIN ~ TARGET + TPRESENT, ncol = 4, scales = "free_x") + theme(aspect.ratio = 1)
-             ggsave(file = paste0('~/Dropbox/Calen/Dropbox/model_histogram_', round(x,3), '.pdf'), p1, height = 40,units = "in")
-  }
-  )
-}
-
-plot_dprime <- function(dprime1, dprime2) {
   library(ggplot2)
-  dprime1 <- dprime1 %>% data.frame %>% 
-    select(BIN, TARGET, eccentricity, SUBJECT, dprime) %>%
-    unique()
-  
-  dprime2 <- dprime2 %>% data.frame %>% 
-    select(BIN, TARGET, eccentricity, SUBJECT, dprime) %>%
-    unique()
-  
-  dprime_combined <- rbind(dprime1, dprime2)
-  
-  p1 <- ggplot(data = dprime_combined, aes(x = eccentricity, y = dprime, colour = SUBJECT)) + geom_point() + facet_grid(BIN ~ TARGET, scales = "free_y")
-  
-  ggsave(file = '~/Dropbox/Calen/Dropbox/figure1.pdf', p1, width = 30, height = 30)
-  
-}
 
-plot_dprime_family <- function(model.dprime) {
-  library(ggplot2)
-  p1 <- ggplot(data = model.dprime, aes(x = (SUBJECT), y = (dprime), colour = as.factor(eccentricity))) +
+  p1 <- ggplot(data = dprime.df, 
+               aes(x = eccentricity, y = dprime, colour = SUBJECT)) +
     geom_point() +
     facet_grid(BIN ~ TARGET, scales = "free_y")
-  ggsave(file = "~/Dropbox/Calen/Dropbox/fig.pdf", p1, width = 30, height = 30, units = "in")
+  
+  ggsave(file = '~/Dropbox/Calen/Dropbox/figure1.pdf', p1, width = 30, height = 30)
+}
+
+# Visualize the efficiency of the human observers.
+plot_efficiency <- function(efficiency.df) {
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  
+  bin_values <- get_experiment_bin_values()
+  
+  m.eff.all <- merge(bin_values, efficiency.df)
+
+  
+  # Efficiency by statistic    
+  fig.1 <- ggplot(m.eff.all, aes(x = statValue, y = log10(efficiency), colour = as.factor(eccentricity))) +
+    facet_grid(~statType) +
+    geom_point() + 
+    geom_line() +
+    #geom_hline(yintercept = average.eff$efficiency.mean) +
+    facet_grid(TARGET ~ statType, scales = "free") +
+    theme_gray()
+
+  ggsave(file = "~/Dropbox/Calen/Dropbox/efficiency.fig.statistic.pdf", width = 10, height = 10 * 1200/1600)
+  
+  # Efficiency by eccentricity
+  
+  fig.dat <- m.eff.all %>%
+    group_by(statType, TARGET) %>%
+    nest() %>%
+    by_row(., function(row) {
+
+      fig.2 <- ggplot(row$data[[1]], aes(x = eccentricity, y = (efficiency), colour = as.factor(statValue))) +
+        geom_point() + 
+        theme_gray()
+      
+      ggsave(file = paste0("~/Dropbox/Calen/Dropbox/efficiency.fig.eccentricity", "-", row$TARGET[[1]], "-", row$statType[[1]], ".pdf"), width = 10, height = 10 * 1200/1600)
+    })
+    
+  plot(fig.2)
+  
+  ggsave(file = "~/Dropbox/Calen/Dropbox/efficiency.fig.statistic.pdf", width = 10, height = 10 * 1200/1600)
   
 }

@@ -38,7 +38,7 @@ get_fitted_psychometric_all <- function(human.responses) {
     arrange(SUBJECT, TARGET, BIN, SESSION, LEVEL, TRIAL, ECCENTRICITY) %>%
     group_by(SUBJECT, TARGET, BIN, HIT, MISS, FALSEALARM, CORRECTREJECTION) %>%
     summarize(ECCENTRICITY = list(ECCENTRICITY)) %>%
-    filter(!SUBJECT %in% c("sps", "jsa", "yhb")) %>%
+    filter(!SUBJECT %in% c("jsa", "yhb")) %>%
     mutate(RESPONSE = ifelse(HIT == 1, "HIT", ifelse(
       MISS == 1,
       "MISS",
@@ -86,7 +86,7 @@ get_fitted_psychometric_all <- function(human.responses) {
         DEoptim(
           g,
           lower = c(e0 = 0, b = 0, gamma = 0),
-          upper = c(e0 = 20, b = 20, gamma = 20),
+          upper = c(e0 = 20, b = 20, gamma = 0),
           control = list(
             trace = 6,
             reltol = .00001,
@@ -103,10 +103,18 @@ get_fitted_psychometric_all <- function(human.responses) {
       gamma = map(params, c("bestmem", "gamma"))
     ) %>%
     unnest(e0, b, gamma)
+  
+  fit.all$d0 <- 5
+  
+  return(fit.all)
 }
 
 # Get nested optimization
 get_fitted_nested <- function(fitted.psychometric) {
+  library(curry)
+  library(dplyr)
+  library(parallel)
+  
   get_fitted.b <- function(b, e) {
     f.list <- lapply(data, function(sub.data) {
       f.eval <- function(x) {
@@ -125,7 +133,7 @@ get_fitted_nested <- function(fitted.psychometric) {
           CR = CR
         )
         
-        f <- partial(f.NLL, list(
+        f <- curry::partial(f.NLL, list(
           b = b,
           d0 = 5,
           gamma = 0, 
@@ -145,7 +153,7 @@ get_fitted_nested <- function(fitted.psychometric) {
     
     initial.pop <-
       as.matrix((data.frame(
-        e0 = fit.all$e0)) %>% 
+        e0 = fitted.psychometric$e0)) %>% 
           sample_n(10))
     
     results.l2 <- mclapply(f.list, function(f.apply) {
@@ -162,12 +170,12 @@ get_fitted_nested <- function(fitted.psychometric) {
         )
       )$optim
       
-      list(optim.result = optim.result)
-      #return(optim.result)
-    }, mc.cores = 15)
+      #list(optim.result = optim.result)
+      return(optim.result)
+    }, mc.cores = 16)
     
     NLL <-
-      do.call(sum, map(results.l2, c("optim.result", "bestval")))
+      do.call(sum, map(results.l2, c("bestval")))
     
     l2.store <- list(b = b, optim = results.l2, NLL = NLL)
     
@@ -183,7 +191,6 @@ get_fitted_nested <- function(fitted.psychometric) {
   max.b <- max(fitted.psychometric$b)
   
   initial.b <- as.matrix(data.frame(b = fitted.psychometric$b) %>% sample_n(10)) # initial parameter for beta 
-  
 
   results.l1 <-
     DEoptim(
@@ -203,25 +210,26 @@ get_fitted_nested <- function(fitted.psychometric) {
   NLL <- unlist(map(storage, "NLL"))
   best.model <- storage[[which(NLL == min(NLL))]]
 
-  fit.nested    <- fit.all %>% ungroup()
+  fit.nested    <- fitted.psychometric %>% 
+    ungroup()
+  
   fit.nested$d0 <- 5
 
   fit.nested$b <- best.model$b
   fit.nested[, c("e0")] <-
-    do.call(rbind, map(best.model$optim, c("optim.result", "bestmem")))
+    do.call(rbind, map(best.model$optim, c("bestmem")))
   fit.nested$gamma <- 0
   
   return(fit.nested)
 }
 
-get_bootstrap_e0 <- function(fit.psychometric) {
+get_bootstrap_e0 <- function(fit.psychometric, n_boot = 100) {
   b     <- mean(fit.psychometric$b)
   gamma <- mean(fit.psychometric$gamma)
   d0    <- mean(fit.psychometric$d0)
   data  <- fit.psychometric$data
   
   data <- fit.psychometric$data
-  
   #
   data.1 <- map(data, function(data) {
     d.1 <- unnest(data)
@@ -234,17 +242,15 @@ get_bootstrap_e0 <- function(fit.psychometric) {
   initial.e0 <- as.matrix(sample(fit.psychometric$e0, 10, replace = F))
   
   
-  boot.samples <- mclapply(1:100, function(x) by_row(fit.psychometric, function(row) {
+  boot.samples <- mclapply(1:n_boot, function(x) by_row(fit.psychometric, function(row) {
     data <- row$data[[1]]
     
     data <- sample_frac(data, 1, replace = T)
     
-    HIT <- unlist(data[data$RESPONSE == "HIT", 2]$ECCENTRICITY)
-    FA <-
-      unlist(data[data$RESPONSE == "FALSEALARM", 2]$ECCENTRICITY)
+    HIT  <- unlist(data[data$RESPONSE == "HIT", 2]$ECCENTRICITY)
+    FA   <-  unlist(data[data$RESPONSE == "FALSEALARM", 2]$ECCENTRICITY)
     MISS <- unlist(data[data$RESPONSE == "MISS", 2]$ECCENTRICITY)
-    CR <-
-      unlist(data[data$RESPONSE == "CORRECTREJECTION", 2]$ECCENTRICITY)
+    CR   <- unlist(data[data$RESPONSE == "CORRECTREJECTION", 2]$ECCENTRICITY)
     
     data.1 <- NULL
     data.1$HIT  <- sample(HIT, replace = T)
@@ -252,7 +258,7 @@ get_bootstrap_e0 <- function(fit.psychometric) {
     data.1$CR   <- sample(CR, replace = T)
     data.1$MISS <- sample(MISS, replace = T)
     
-    f <- partial(f.NLL, list(d0 = 5, b = b, data = data.1, gamma = 0))
+    f <- curry::partial(f.NLL, list(d0 = 5, b = b, data = data.1, gamma = 0))
     
     results.l1 <-
       DEoptim(
@@ -269,8 +275,54 @@ get_bootstrap_e0 <- function(fit.psychometric) {
       )
     
     return(results.l1$optim$bestmem)
-  }))
+  }, .to = "boot_e0"))
    
+}
+
+# Refit psychometric function fit with a varying beta with a beta now fixed by target.
+get_fit_fixed_b <- function(human.psychometrics) {
+  grouped.b <- human.psychometrics %>%
+    group_by(SUBJECT) %>%
+    mutate(b = mean(b))
+  
+  fitted.e0  <- grouped.b %>%
+    group_by(SUBJECT, TARGET, BIN) %>%
+    nest(-SUBJECT, -TARGET) %>%
+    mutate(e0 = map(data, function(data) {
+      sub.data <- data$data[[1]]
+      
+      HIT  <- unlist(sub.data[sub.data$RESPONSE == "HIT", 1]$ECCENTRICITY)
+      FA   <-
+        unlist(sub.data[sub.data$RESPONSE == "FALSEALARM", 1]$ECCENTRICITY)
+      MISS <-
+        unlist(sub.data[sub.data$RESPONSE == "MISS", 1]$ECCENTRICITY)
+      CR   <-
+        unlist(sub.data[sub.data$RESPONSE == "CORRECTREJECTION", 1]$ECCENTRICITY)
+      
+      responses <- list(
+        HIT = HIT,
+        FA = FA,
+        MISS = MISS,
+        CR = CR
+      )
+      
+      b     <- data$b
+      d0    <- data$d0
+      gamma <- data$gamma
+
+      f <- curry::partial(f.NLL, list(d0 = d0, b = b, gamma = gamma, data = responses))
+      #f(1)
+      optim.eval <- optimize(f, c(0,20))$min
+    })) %>%
+    unnest(e0) %>%
+    select(SUBJECT, TARGET, BIN, e0)
+    
+  fitted.psychometric <- grouped.b %>%
+    select(-e0) %>%
+    merge(fitted.e0, ., by = c("SUBJECT", "TARGET", "BIN")) %>%
+    as_tibble() %>%
+    select(-data, -params) %>%
+    arrange(SUBJECT, TARGET, BIN)
 }
 
 # Objective function

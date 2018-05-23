@@ -34,61 +34,24 @@ get_model_psychometric <- function(model.dprime, scale.dprime = 1) {
     unnest()
   
   return(fitted.params)
-  
 }
 
 fit.scaled.thresholds <- function(human.psychometrics, model.dprime) {
   
-  human.thresholds <- get_threshold(human.psychometrics)
+  human.thresholds <- get_threshold(human.psychometrics) %>%
+    select(TARGET, SUBJECT, BIN, threshold)
   
   f <- function(a) {
     pf <- get_model_psychometric(model.dprime, a)
     
-    model <- pf %>% arrange(TARGET, BIN, SUBJECT) %>% get_threshold(.)
+    model <- pf %>% arrange(TARGET, BIN, SUBJECT) %>% get_threshold(.) %>%
+      select(TARGET, SUBJECT, BIN, threshold) %>% full_join(human.thresholds, ., by = c("TARGET", "BIN"))
     
-    human <- human.thresholds %>% arrange(TARGET, BIN, SUBJECT)
-    
-    NLL <- sum(-dnorm(model$threshold, mean = human$threshold, sd = 1, log = TRUE))
-    
+    obj <- sum((model$threshold.x - model$threshold.y)^2)
   }
   
-  m1 <- mle2(f, start = list(a = .5), data = model.dprime)
+  m1 <- optimize(f, lower = c(a = .001), upper = c(a = .25))
   
-  return(coef(m1)[1])
-  
-  
+  return(m1$minimum)
 }
 
-get.model.human.rho <- function(model.thresholds, human.thresolds) {
-  bin.values <- get_experiment_bin_values()
-  
-  m <- model.thresholds %>%
-    arrange(TARGET, BIN) %>%
-    select(TARGET, BIN, threshold) %>%
-    merge(., bin.values) %>%
-    arrange(TARGET, statType, BIN)
-  
-  h <- human.thresholds %>%
-    data.frame %>%
-    group_by(TARGET, BIN) %>%
-    summarize(threshold = mean(threshold)) %>%
-    select(TARGET, BIN, threshold) %>%
-    merge(., bin.values) %>%
-    arrange(TARGET, statType, BIN)
-  
-  cor.val <- rbind(m %>% mutate(type = "model"), h %>% mutate(type = "human")) %>%
-    spread(key = type, value = threshold) %>%
-    group_by(TARGET, statType) %>%
-    mutate(human = scale(human), model = scale(model)) %>%
-    group_by(statType) %>%    
-    summarize(cor(human, model))
-  
-  fig.dat <- rbind(m %>% mutate(type = "model"), h %>% mutate(type = "human")) %>%
-    spread(key = type, value = threshold) %>%
-    group_by(TARGET, statType) %>%
-    mutate(human = scale(human), model = scale(model))
-  
-  plot.fig <- ggplot(data = fig.dat, aes(x = human, y = model, colour = TARGET)) + geom_point() + facet_grid(~statType)
-
-  save(file = '~/Dropbox/Calen/Dropbox/threshold.scatter.pdf')
-}

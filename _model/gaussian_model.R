@@ -115,31 +115,3 @@ get_NLL <- function(ECC, template_response, human_pc_exp) {
   }
 }
 
-#' Compute the efficiency of the optimal and human responses
-get_efficiency <- function(human.psychometric, optimal.observer) {
-  library(purrrlyr)
-  
-  model.dat <- optimal.observer %>%
-    select(SUBJECT, BIN, TARGET, eccentricity, dprime)
-  
-  human.dat <- human.psychometric %>%
-    select(SUBJECT, BIN, TARGET, d0, e0, b, gamma) %>%
-    mutate(e0 = as.numeric(e0))
-  
-  optim.human.dat <- merge(model.dat, human.dat, by = c("TARGET", "BIN"))
-  
-  efficiency <- by_row(optim.human.dat, function(row) {
-    e0  <- row$e0
-    b   <- row$b
-    d0  <- row$d0
-    ecc <- row$eccentricity
-    
-    dprime.human <- d0 * e0^b/(e0^b + ecc^b)
-  }, .to = "dprime.human") %>%
-    unnest(dprime.human) %>%
-    mutate(efficiency = dprime.human/dprime) %>%
-    select(BIN, TARGET, eccentricity, efficiency) %>%
-    arrange(BIN, TARGET, eccentricity)
-  
-  return(efficiency)
-}

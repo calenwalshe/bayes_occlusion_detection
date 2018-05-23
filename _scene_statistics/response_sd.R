@@ -14,7 +14,6 @@ import_stats <- function(file_path = '~/Dropbox/Calen/Dropbox/') {
   
   scene_stats <- lapply(files, FUN = function(x) read.table(x, header = T, sep = "\t"))
   
-  
   scene_stats_all <- do.call(rbind, scene_stats) %>%
     rename(response = tSigma)
   
@@ -119,7 +118,7 @@ plot_sebastian_fit <- function(response_stats.df) {
 }
 
 # Fit a function to the standard standard deviations of the template responses.
-fit.template.stats <- function(scene_statistics, eccLvl = c(1,3)) {
+fit.template.stats <- function(scene_statistics, eccLvl = c(1)) {
   library(bbmle)
   library(dplyr)
   library(tidyr)
@@ -148,25 +147,25 @@ fit.template.stats <- function(scene_statistics, eccLvl = c(1,3)) {
     gather(response, value, prediction, response)
 
   # Plot Template Response Statistics
-  
   model.response %>%
+    filter(L == 5) %>%
+    rename(Contrast = Cvals, Similarity = Svals) %>%
     group_by(ecc_deg) %>%
     nest() %>%
     mutate(fig.vis = map2(ecc_deg, data, function(ecc_arg, model_arg) {
-      fig.1 <- ggplot(data = model_arg, aes(x = Svals , y = value, colour = as.factor(Cvals), linetype = as.factor(response), shape = as.factor(response))) +
-        geom_point() +
-        geom_line() +
-        facet_wrap(Lvals ~ TARGET, ncol = 8, scale = "free") +
-        theme_bw(base_size = 30) +
+      fig.1 <- ggplot(data = model_arg, aes(x = Similarity , y = value / max(value), colour = as.factor(Contrast))) +
+        geom_point(data = model_arg %>% filter(response == "response")) +
+        geom_line(data = model_arg %>% filter(response == "prediction")) +
+        facet_wrap(~ TARGET, ncol = 2) +
+        theme_set(theme_bw(base_size = 35))  +# pre-set the bw theme.
         theme(aspect.ratio = 1) +
-        list(theme(legend.title = element_text(size=40),
-                   plot.title = element_text(size = 40),
-                   axis.title = element_text(size=40),
-                   axis.text = element_text(size=25),
-                   legend.text = element_text(size=40)))
+        expand_limits(x = c(.45, .85), y = c(0, .015)) +
+        scale_color_manual(name = "Contrast (RMS)", values = pal) +
+        ylab("Template Response (sd)")
       
+      plot(fig.1)
   
-      ggsave(plot = fig.1, filename = paste0('~/Dropbox/Calen/Dropbox/template_sigma_', ecc_arg,'.pdf'), width = 40, height = 40)
+      ggsave(plot = fig.1, filename = paste0('~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/template_sigma_', ecc_arg,'.pdf'), scale = 1.35)
     }))
   
   fitted.params <- cbind(m.1[,1:3],data.frame(do.call(rbind, map(m.1$model, coef)))) 
@@ -177,21 +176,6 @@ fit.template.stats <- function(scene_statistics, eccLvl = c(1,3)) {
   
   fitted.params.long <- fitted.params %>%
     gather("param_label", "v", 4:8)
-  
-  fig.fitted <- ggplot(fitted.params.long, aes(x = ecc_deg, y = v, colour = TARGET)) + 
-    geom_point() + 
-    geom_line() + 
-    facet_wrap(~param_label, scales = "free_y", nrow = 1) +
-    theme(aspect.ratio = 1) +
-    list(theme(legend.title = element_text(size=40),
-               plot.title = element_text(size = 40),
-               axis.title = element_text(size=40),
-               axis.text = element_text(size=25),
-               legend.text = element_text(size=40)))
-  
-  
-  ggsave(plot = fig.fitted, filename = paste0('~/Dropbox/Calen/Dropbox/template_stats_parameter_fig.pdf'), width = 40, height = 40)
-  
 }
 
 fit.edge.stats <- function(scene_statistics) {
@@ -207,7 +191,7 @@ fit.edge.stats <- function(scene_statistics) {
   
   edge.stats <- scene_statistics %>%
     filter(eccentricity %in% eccLvl, response_type == "Eabs", statistic == "sigma", !is.nan(response)) %>%
-    group_by(TARGET, L, C, Lvals, Cvals) %>% 
+    group_by(TARGET, L, C, Lvals, Cvals, ecc_deg) %>% 
     summarize(response = mean(response)) %>%
     group_by(TARGET) %>%
     nest()
@@ -225,16 +209,26 @@ fit.edge.stats <- function(scene_statistics) {
     unnest(data, prediction) %>%
     gather(response, value, prediction, response)
   
-  # Plot Edge Response Statistics
-  
-  fig.1 <- ggplot(data = model.response, aes(x = Cvals , y = value, linetype = as.factor(response), colour = as.factor(Lvals))) +
-    geom_point() +
-    geom_line() +
-    facet_wrap(~TARGET, ncol = 4) +
-    theme_bw(base_size = 30) + 
-    theme(aspect.ratio = 1)
-  
-  ggsave(plot = fig.1, filename = paste0('~/Dropbox/Calen/Dropbox/edge_sigma.pdf'), width = 40, height = 40)
+  model.response %>%
+    rename(Luminance = Lvals, Contrast = Cvals) %>%
+    group_by(ecc_deg) %>%
+    nest() %>%
+    mutate(fig.vis = map2(ecc_deg, data, function(ecc_arg, model_arg) {
+      fig.1 <- ggplot(data = model_arg, aes(x = Contrast , y = value / max(value), colour = as.factor(Luminance))) +
+        geom_point(data = model_arg %>% filter(response == "response")) +
+        geom_line(data = model_arg %>% filter(response == "prediction")) +
+        facet_wrap(~ TARGET, ncol = 2) +
+        theme_set(theme_bw(base_size = 35))  +# pre-set the bw theme.
+        theme(aspect.ratio = 1) +
+        expand_limits(x = c(.45, .85), y = c(0, .015)) +
+        scale_color_manual(name = "Luminance (%)", values = pal) +
+        #ylab("Edge Response (sd)")
+        ylab(expression(" blah sqrt(eta)"))
+      
+      plot(fig.1)
+      
+      ggsave(plot = fig.1, filename = paste0('~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/edge_sigma_', ecc_arg,'.pdf'), scale = 1.35)
+    }))
   
   do.call(rbind, map(m.1$model, coef)) %>%
     kable(format = 'latex') %>%

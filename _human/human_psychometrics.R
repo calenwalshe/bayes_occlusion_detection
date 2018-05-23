@@ -8,23 +8,19 @@ get_human_responses <-
     
     human_data <- read.table(path, sep = "\t", header = T)
     
-    human_data <- human_data %>% filter(!SUBJECT %in% c("jsa",
-                                                        "yhb"), TRIAL != 1) %>%
+    human_data <- human_data %>% filter(!SUBJECT %in% c("jsa", "yhb"), TRIAL != 1) %>% 
       rename(BIN = BINS)
     
     #human_data <- human_data %>% group_by(SUBJECT, BIN, TARGET) %>%
     #  mutate(n_ecc = length(unique((ECCENTRICITY)))) %>% filter(!(SESSION ==
     #                                                                2 & n_ecc > 5))
     
-    human_data$CORRECT <-
-      ifelse(human_data$HIT == 1 | human_data$CORRECTREJECTION ==
-               1, 1, 0)
+    human_data$CORRECT <- ifelse(human_data$HIT == 1 | human_data$CORRECTREJECTION == 1, 1, 0)
     
     human_data$BIN <- factor(human_data$BIN)
     
-    human_data <-
-      merge(human_data, bin_values) %>% arrange(SUBJECT,
-                                                TARGET, BIN, statType, SESSION, ECCENTRICITY)
+    human_data <- merge(human_data, bin_values) %>% 
+      arrange(SUBJECT, TARGET, BIN, statType, SESSION, ECCENTRICITY)
     
     return(human_data)
   }
@@ -60,13 +56,6 @@ get_human_detect <- function(human_data) {
     rename(eccentricity = ECCENTRICITY) %>%
     arrange(SUBJECT, BIN, TARGET, eccentricity, percent_correct) %>%
     data.frame()
-  
-  human_detect$TARGET <-
-    factor(
-      human_detect$TARGET,
-      levels = c("vertical", "horizontal", "bowtie", "spot"),
-      ordered = T
-    )
   
   human_detect        <- human_detect %>%
     arrange(SUBJECT, statType, TARGET, BIN, eccentricity)
@@ -130,57 +119,60 @@ get_threshold <- function(psychometric_parameters) {
 plot_publication_thresholds <-
   function(human.thresholds,
            model.thresholds,
-           out_path = "~/Dropbox/Calen/Dropbox/",
            statIn = "Lvals") {
     
+    library(ggthemes)
     human.thresholds <- human.thresholds %>%
       mutate(TARGET = factor(TARGET, levels = c("vertical", "horizontal", "bowtie", "spot")))
     
     model.thresholds <- model.thresholds %>%
       mutate(TARGET = factor(TARGET, levels = c("vertical", "horizontal", "bowtie", "spot")))
-    library(ggthemes)
     
     human.threshold.1 <- human.thresholds %>%
       group_by(TARGET, BIN, SUBJECT) %>%
-      summarize(threshold = mean(threshold)) %>%
-      select(TARGET, BIN, threshold, SUBJECT) %>%
-      data.frame
+      summarize(se = se, threshold = mean(threshold)) %>%
+      select(TARGET, BIN, threshold, SUBJECT, se) %>%
+      as_tibble()
     
     model.threshold.1 <- model.thresholds %>%
       select(TARGET, BIN, threshold, SUBJECT) %>%
-      data.frame
+      as_tibble()
     
-    threshold_values <-
-      rbind(model.threshold.1, human.threshold.1) %>%
-      data.frame
+    threshold_values <- full_join(model.threshold.1, human.threshold.1)
     
     bin_values <- get_experiment_bin_values()
+    
     d.1 <- merge(threshold_values, bin_values) %>%
       group_by(TARGET, BIN, statValue, statType, SUBJECT) %>%
-      summarize(threshold = mean(threshold)) %>%
-      filter(statType == statIn)
+      summarize(se = se, threshold = mean(threshold)) %>%
+      filter(statType == statIn) %>%
+      arrange(TARGET, BIN, SUBJECT)
     
     
     t.1.plot <-
       ggplot(data = d.1, aes(x = statValue, y = threshold,
                              colour = SUBJECT, group = SUBJECT)) +
-      geom_point() +
-      geom_line() +
-      facet_wrap( ~ TARGET) +
-      theme_light() +
-      theme(aspect.ratio = 1) +
-      ylab("Eccentricity Threshold")
+      geom_point(size = 2) +
+      geom_line(size = 1.25) +
+      facet_wrap(~ TARGET) +
+      theme_set(theme_bw(base_size = 35))  +# pre-set the bw theme.
+      theme(aspect.ratio = 1, legend.key.height=unit(3,"line")) +
+      scale_color_brewer(name = "Subject", palette = "Dark2") +
+      ylab("Eccentricity Threshold (º)")
     
     if (statIn == "Lvals") {
-      t.1.plot <- t.1.plot + expand_limits(x = 0,
-                                           y = c(5, 23)) + xlab("Background Luminance")
+      t.1.plot <- t.1.plot + expand_limits(x = c(0,1), y = c(0, 23)) + xlab("Background Luminance (%)") +
+        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = 4) +
+        theme(legend.position = 'none')
     } else if (statIn == "Cvals") {
-      t.1.plot <- t.1.plot + expand_limits(x = 0,
-                                           y = 1) + xlab("Background Contrast")
+      t.1.plot <- t.1.plot + expand_limits(x = c(0, 1), y = c(0, 15)) + xlab("Background Contrast (RMS)") +
+        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = .1) +
+        theme(legend.position = 'none')
     } else if (statIn == "Svals") {
-      t.1.plot <- t.1.plot + xlim(0.4, 0.9) +
-        expand_limits(x = 0, y = 0.9) + xlab("Background Similarity")
+      t.1.plot <- t.1.plot + expand_limits(x = c(.4,1), y = c(0,18)) + xlab("Background Similarity") +
+        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = .025) +
+        theme(legend.position = 'none')
     }
     plot(t.1.plot)
-    ggsave(t.1.plot, file = paste0(out_path, statIn, "_thresholds.pdf"))
+    ggsave(t.1.plot, file = paste0('~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/', statIn, "_thresholds.pdf"), scale= 1.35)
   }

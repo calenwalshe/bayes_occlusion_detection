@@ -53,3 +53,45 @@ plot_psychometric <- function(psychometric.params, empirical.obs, bin = 1, targe
       ggsave(plot = fig, filename = paste0('~/Dropbox/Calen/Dropbox/', SUBJECT, '-', TARGET,'-', BIN, '.pdf'), device = 'pdf')      
     })
 }
+
+# Plot a single bin. Pretty and ready for presentation.
+plot.figure.bin <- function(human.psychometrics, human.detect) {
+    human.dat <- human.detect %>% filter(BIN == 3)
+    human.psychometrics$TARGET <- factor(human.psychometrics$TARGET, levels = c("vertical", "horizontal", "bowtie", "spot"))
+    obs.dat   <- human.psychometrics %>%
+      filter(BIN == 3) %>%
+      group_by(TARGET, BIN, SUBJECT) %>%
+      nest() %>%
+      mutate(psy.obs = map(data, function(x) {
+        e0 <- x$e0
+        b  <- x$b
+        gamma <- x$gamma
+        d0    <- x$d0
+        
+        ecc <- seq(0, 23, .1)
+        
+        obs <- pnorm(1/2 * d0 * e0^b/(e0^b + ecc^b))
+        
+        data.frame(eccentricity = ecc, percent_correct = obs, threshold = x$threshold)
+      })) %>%
+      unnest(psy.obs)
+    
+    fig <- ggplot(data = obs.dat, aes(x = eccentricity, y = percent_correct, colour = SUBJECT)) + 
+      geom_line(size = 1.5) + 
+      geom_point(data = human.dat, aes(x = eccentricity, y = percent_correct), size = 2.25) +
+      facet_wrap(~TARGET) +
+      theme_bw() +
+      theme(aspect.ratio = 1) + 
+      theme_set(theme_bw(base_size = 45))  +# pre-set the bw theme.
+      scale_color_brewer(name = "Subject", palette = "Dark2") +
+      expand_limits(y = c(.5, 1)) +
+      xlab("Eccentricity (º)") +
+      ylab("Percent Correct")
+    
+    
+    plot(fig)
+    
+    ggsave(file = '~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/center_bin_psychometrics.pdf', fig, scale = 1.35, limitsize = FALSE)
+
+}
+

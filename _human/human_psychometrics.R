@@ -20,7 +20,8 @@ get_human_responses <-
     human_data$BIN <- factor(human_data$BIN)
     
     human_data <- merge(human_data, bin_values) %>% 
-      arrange(SUBJECT, TARGET, BIN, statType, SESSION, ECCENTRICITY)
+      arrange(SUBJECT, TARGET, BIN, statType, SESSION, ECCENTRICITY) %>%
+      as_tibble()
     
     return(human_data)
   }
@@ -34,7 +35,7 @@ get_human_detect <- function(human_data) {
   
   human_detect <- human_data %>%
     group_by(SUBJECT, ECCENTRICITY, BIN, TARGET) %>%
-    summarize(
+    dplyr::summarize(
       hit = sum(HIT == 1) / (sum(HIT == 1) + sum(MISS == 1)),
       miss = sum(MISS == 1) / (sum(MISS == 1) + sum(HIT == 1)),
       falsealarm = sum(FALSEALARM == 1) / (sum(FALSEALARM == 1) + sum(CORRECTREJECTION == 1)),
@@ -110,7 +111,8 @@ get_threshold <- function(psychometric_parameters) {
   thresholds <- psychometric_parameters %>%
     rowwise() %>%
     mutate(threshold = ((d0 *
-                           e0 ^ b) / 1 - e0 ^ b) ^ (1 / b))
+                           e0 ^ b) / 1 - e0 ^ b) ^ (1 / b),
+           threshold_pc = (e0^b * ((2 * qnorm(.7))/d0)^-1 - e0^b)^(1/b))
   
   return(thresholds)
 }
@@ -140,18 +142,20 @@ plot_publication_thresholds <-
     
     threshold_values <- full_join(model.threshold.1, human.threshold.1)
     
+    threshold_values <- threshold_values %>% mutate(linetype = ifelse(SUBJECT %in% c("dprime.opt", "dprime.sub") ,1,2))
+    
     bin_values <- get_experiment_bin_values()
     
     d.1 <- merge(threshold_values, bin_values) %>%
       group_by(TARGET, BIN, statValue, statType, SUBJECT) %>%
-      summarize(se = se, threshold = mean(threshold)) %>%
+      summarize(se = se, threshold = mean(threshold), linetype = linetype) %>%
       filter(statType == statIn) %>%
       arrange(TARGET, BIN, SUBJECT)
     
-    
+    d.1$linetype <- as.factor(d.1$linetype)
     t.1.plot <-
       ggplot(data = d.1, aes(x = statValue, y = threshold,
-                             colour = SUBJECT, group = SUBJECT)) +
+                             colour = SUBJECT, group = SUBJECT, linetype = linetype)) +
       geom_point(size = 2) +
       geom_line(size = 1.25) +
       facet_wrap(~ TARGET) +
@@ -162,16 +166,13 @@ plot_publication_thresholds <-
     
     if (statIn == "Lvals") {
       t.1.plot <- t.1.plot + expand_limits(x = c(0,1), y = c(0, 23)) + xlab("Background Luminance (%)") +
-        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = 4) +
-        theme(legend.position = 'none')
+        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = 4)
     } else if (statIn == "Cvals") {
       t.1.plot <- t.1.plot + expand_limits(x = c(0, 1), y = c(0, 15)) + xlab("Background Contrast (RMS)") +
-        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = .1) +
-        theme(legend.position = 'none')
+        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = .1)
     } else if (statIn == "Svals") {
       t.1.plot <- t.1.plot + expand_limits(x = c(.4,1), y = c(0,18)) + xlab("Background Similarity") +
-        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = .025) +
-        theme(legend.position = 'none')
+        geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = .025)
     }
     plot(t.1.plot)
     ggsave(t.1.plot, file = paste0('~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/', statIn, "_thresholds.pdf"), scale= 1.35)

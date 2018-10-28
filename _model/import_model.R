@@ -7,7 +7,8 @@ get_template_response <- function(file_path) {
     library(tidyr)
     library(dplyr)
     
-    template_response <- get_raw_data(file_path)
+    template_response <- get_raw_data(file_path) %>%
+      as_tibble()
     
     template_response <- template_response %>% mutate(TARGET = ifelse(TARGET == 
         1, "vertical", ifelse(TARGET == 2, "horizontal", ifelse(TARGET == 
@@ -21,7 +22,7 @@ get_template_response <- function(file_path) {
     template_response <- merge(template_response, bin_values)
     
     pyramidLvl <- data.frame(PYRAMIDLVL = c(1, 2, 3, 4, 5), 
-        eccentricity = c(0.000000, 1.381106, 4.621447, 11.509662, 23.099524), 
+        eccentricity = c(0.000000, 1.334897, 4.521219, 11.297740, 22.751504), 
         downsampleR = c(1, 2, 4, 8, 16))
     
     template_response <- merge(template_response, pyramidLvl) %>% 
@@ -55,7 +56,8 @@ get_template_response <- function(file_path) {
     
     template_response <- template_response %>% filter(function_name %in% 
         c("pattern_only", "mean_only", "edge_cos")) %>% arrange(TARGET, 
-        BIN, statType, eccentricity)
+        BIN, statType, eccentricity) %>%
+      as_tibble()
     
     return(template_response)
 }
@@ -99,6 +101,7 @@ get_experiment_bin_values <- function() {
         levels <- c("Lvals", "Cvals", "Svals"))
     
     
+    experiment_bin_values$BIN <- as.factor(experiment_bin_values$BIN)
     return(experiment_bin_values)
 }
 
@@ -124,11 +127,14 @@ get_bin_values <- function() {
 }
 
 #' Get eccentricities
-#' Get receptive field spacing based on Drasdo.
+#' Get receptive field spacing based on Drasdo (2007).
 get_eccentricity <- function(model_space, direction = "temporal") {
-  pyramid_space    <- c(0.008333333333,0.01666666667,0.03333333333,0.06666666667,0.1333333333)
+  library(Hmisc)
+  pyramid_space    <- 1/(120/(2^seq(0,5,1)))
   degrees          <- c(0,0.25,0.5,1,2,5,10,15,20,25,30)
-  temporal_spacing <- c(0.008333333333,0.01004093745,0.01161866051,0.01457454651,0.02006415268,0.03524948451,0.05943852855,0.08337812416,0.115259782,0.1444151473,  0.1813126962)
+  gc_count         <- c(27930, 19438, 14368, 9131, 4818, 1561, 549, 279, 146, 93, 59)
+  spacing          <- 1/sqrt(gc_count/2)
+  spacing[1]          <- 1/120
   
-  return(approx(spacing, degrees, pyramid_space))
+  approxExtrap(spacing, degrees, pyramid_space)
 }

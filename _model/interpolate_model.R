@@ -1,35 +1,10 @@
-get_interpolated_model_responses <- function(template_response, 
-    in_target, in_eccentricity, in_bin, in_function_name, in_tpresent) {
-    
-    # print(in_target) print(in_eccentricity) print(in_bin)
-    # print(in_function_name) print(in_tpresent)
-    
-    pyr_ecc <- unique(template_response$eccentricity)
-    pyr_ecc_low <- c(max(which((in_eccentricity - pyr_ecc) > 
-        0)), min(which((in_eccentricity - pyr_ecc) < 0)))
-    
-    ecc_vals <- pyr_ecc[pyr_ecc_low]
-    
-    d.1 <- template_response %>% filter(eccentricity %in% ecc_vals, 
-        TARGET == in_target, BIN == in_bin, function_name == 
-            in_function_name, TPRESENT == in_tpresent) %>% select(-statType, 
-        -statValue, -L, -C, -S) %>% distinct() %>% data.frame()
-    
-    lm.1 <- d.1 %>% mutate(TRESP = TRESP) %>% group_by(SAMPLE) %>% 
-        do(lin_mod = augment(lm(TRESP ~ eccentricity, data = .), 
-            newdata = data.frame(eccentricity = in_eccentricity))) %>% 
-        select(lin_mod)
-    
-    new.dat <- unlist(lapply(lm.1$lin_mod, FUN = function(x) x$.fitted))
-    
-    
-    d.2 <- d.1 %>% filter(eccentricity == ecc_vals[1])
-    d.2$eccentricity <- in_eccentricity
-    d.2$TRESP <- new.dat
-    
-    
-    return(d.2)
-    
+interpolated.model <- function(template_response, human.responses) {
+# Interpolate the model response for measured human eccentricities.
+  human.eccentricities <- human.responses %>%
+    select(TRIAL, TARGET, BIN, SUBJECT, SESSION, ECCENTRICITY, PATCHID) %>%
+    unique() %>%
+    rename(eccentricity = ECCENTRICITY)
+  
 }
 
 #' Title
@@ -56,4 +31,35 @@ get_all_interpolated <- function(template_response) {
         mc.cores = 16)
     
     return(interpolated_responses)
+}
+
+interpolate_dprime <- function(model.dprime, human.dprime) {
+  
+  model.dprime <- model.dprime %>% rename(type = SUBJECT)
+  
+  human.dprime$BIN <- as.factor(human.dprime$BIN)
+  model.dprime$BIN <- as.factor(model.dprime$BIN)
+  
+  human.dprime$TARGET <- as.factor(human.dprime$TARGET)
+  model.dprime$TARGET <- as.factor(model.dprime$TARGET)
+  
+  human.dprime <- human.dprime %>%
+    select(SUBJECT, TARGET, BIN, eccentricity, dprime) %>% 
+    distinct()
+  
+  human.measure <- human.dprime %>% select(TARGET, BIN, SUBJECT, eccentricity)
+  
+  dprime.interpolate <- model.dprime %>% group_by(type, TARGET, BIN) %>%
+    nest() %>%
+    left_join(., human.measure, by = c("TARGET", "BIN")) %>%
+    mutate(dprime_hat = map2(eccentricity, data, function(x,y) {
+      x_in <- y$eccentricity
+      y_in <- y$dprime
+      
+      approxExtrap(x_in, y_in, x)$y
+      
+    })) %>%
+    unnest(dprime_hat)
+  
+  dprime.interpolate %>% select(-data) %>% left_join(., human.dprime, by = c("TARGET", "BIN", "SUBJECT", "eccentricity"))
 }

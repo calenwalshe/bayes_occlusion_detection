@@ -19,8 +19,8 @@ get_optimal_model <- function(model.wide) {
     scalar.dist2 <- 1 / sqrt(det(2 * pi * cov2))
     
     f <- function(x) {
-      gauss_f1 <- scalar.dist1 * exp(-.5*(t(x - mean1) %*% inv_cov1 %*% (x - mean1) - scale))
-      gauss_f2 <- scalar.dist2 * exp(-.5*(t(x - mean2) %*% inv_cov2 %*% (x - mean2) - scale))
+      gauss_f1 <- scalar.dist1 * exp(-.5*(t(x - mean1) %*% inv_cov1 %*% (x - mean1)) + scale)
+      gauss_f2 <- scalar.dist2 * exp(-.5*(t(x - mean2) %*% inv_cov2 %*% (x - mean2)) + scale)
       min(gauss_f1,gauss_f2, na.rm = T)
     }
     
@@ -56,7 +56,7 @@ get_optimal_model <- function(model.wide) {
            roots       = list(find_root(data_mean_vec_0, data_mean_vec_1, data_cov_mat_0, data_cov_mat_1)),
            roots_mle   = list(find_roots_optim(roots[1:3], data_mean_vec_0, data_mean_vec_1, data_cov_mat_0, data_cov_mat_1)),
            coord       = list(roots_mle[1:3]),
-           scale_gauss = list((coord - data_mean_vec_0) %*% solve(data_cov_mat_0) %*% (coord - data_mean_vec_0))) %>%
+           scale_gauss = list(.5*(coord - data_mean_vec_0) %*% solve(data_cov_mat_0) %*% (coord - data_mean_vec_0))) %>%
     select(TARGET, BIN, scale_gauss, coord, roots, roots_mle, eccentricity, data_mean_vec_0, data_mean_vec_1, data_cov_mat_0, data_cov_mat_1, SUBJECT) 
 
     scaled.integrate <- scaled.model %>%
@@ -74,7 +74,7 @@ get_optimal_model <- function(model.wide) {
       unnest(data) %>%
       mutate(integral = map(integrate_min, function(x) { x$value }))
     
-    integrate.result <- scaled.integrate %>% mutate(dprime = -2*qnorm(log(integral[[1]]) - .5*scale_gauss[[1]], 0, 1, log.p = T),
+    integrate.result <- scaled.integrate %>% mutate(dprime = abs(2*qnorm(log(integral[[1]]) - scale_gauss[[1]], 0, 1, log.p = T)),
            dprime_compare = -2*qnorm(-.5*scale_gauss[[1]], 0, 1, log.p = T)) %>%
     arrange(TARGET, BIN, eccentricity)
 

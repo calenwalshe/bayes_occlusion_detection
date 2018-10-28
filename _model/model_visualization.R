@@ -44,7 +44,7 @@ plot_efficiency <- function(efficiency.df, plotType = 1) {
           ylab(expression(sqrt(eta)))
         
         plot(fig.1)
-        ggsave(file = paste0("~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/efficiency.fig.", statType, ".statistic.pdf"))
+        ggsave(file = paste0("~/Dropbox/Calen/Dropbox/efficiency.fig.", statType, ".statistic.pdf"))
       }))
 
     
@@ -67,9 +67,8 @@ plot_efficiency <- function(efficiency.df, plotType = 1) {
   
     plot(fig.1)  
     ggsave(file = "~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/efficiency_eccentricity.pdf")
-  } # eccentricity
-  
-}
+   }
+  }
 
 #' Compute the efficiency of the optimal and human responses
 get_efficiency <- function(human.psychometric, optimal.observer) {
@@ -83,7 +82,7 @@ get_efficiency <- function(human.psychometric, optimal.observer) {
     mutate(e0 = as.numeric(e0))
   
   optim.human.dat <- merge(model.dat, human.dat, by = c("TARGET", "BIN"))
-  
+
   efficiency <- by_row(optim.human.dat, function(row) {
     e0  <- row$e0
     b   <- row$b
@@ -96,7 +95,7 @@ get_efficiency <- function(human.psychometric, optimal.observer) {
     mutate(efficiency = dprime.human/dprime) %>%
     select(BIN, TARGET, eccentricity, efficiency) %>%
     arrange(BIN, TARGET, eccentricity)
-  
+
   bin_labels <- get_experiment_bin_values()
   efficiency <- merge(efficiency, bin_labels)
   return(efficiency)
@@ -190,9 +189,13 @@ get.model.cor.dprime <- function(model.dprime, human.psychometrics) {
 
 plot.model.psychometric <- function(model.psychometric, model.dprime) {
   library(ggplot2)
-  model.dprime.nest <- model.dprime %>% group_by(TARGET, BIN) %>% nest()
+  
+  model.dprime.nest <- model.dprime %>%
+    group_by(TARGET, BIN, SUBJECT) %>%
+    nest()
   
   model.data <- merge(model.psychometric, model.dprime.nest) %>% as_tibble()
+  
   by_row(model.data, function(row) {
     empirical.dat <- row$data[[1]]
     eccentricity <- seq(0, 23, .1)
@@ -202,10 +205,10 @@ plot.model.psychometric <- function(model.psychometric, model.dprime) {
     gamma <- row$gamma
     dprime.obs   <- d0 * e0^b/(e0^b + eccentricity^b)
     
-    plot.dat <- data.frame(eccentricity = eccentricity, dprime = dprime.obs)
+    plot.dat <- data.frame(SUBJECT = row$SUBJECT, eccentricity = eccentricity, dprime = dprime.obs)
     fig      <- ggplot(empirical.dat, aes(x = eccentricity, y = dprime)) + geom_point() + geom_line(data = plot.dat, aes(x = eccentricity, y = dprime))
     
-    ggsave(filename = paste0('~/Dropbox/Calen/Dropbox/', row$TARGET,'-', row$BIN, '.pdf'), device = "pdf", plot = fig)
+    ggsave(filename = paste0('~/Dropbox/Calen/Dropbox/', row$TARGET,'-', row$BIN, '-', row$SUBJECT, '.pdf'), device = "pdf", plot = fig)
   }, .to = "f.ggplot")
 }
 

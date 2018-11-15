@@ -1,4 +1,4 @@
-export.responses <- function() {
+export.responses <- function(file_path = '~/Dropbox/Calen/Dropbox/experiment_settings/subject_out/periphery/') {
 
 # Import Subject Responses
 
@@ -10,7 +10,7 @@ files <- expand.grid(c("rcw", "sps", "yhb"), c("vertical", "horizontal", "bowtie
 all.response <- apply(files, 1,FUN = function(file) {
   subject <- file[1]
   target  <- file[2]
-  data <- readMat(paste0('~/Dropbox/Calen/Dropbox/experiment_settings/subject_out/periphery/', as.character(target), '/', as.character(subject), '.mat'))
+  data <- readMat(paste0(file_path, as.character(target), '/', as.character(subject), '.mat'))
   
   SubjectFile <- data$SubjectExpFile
   dataID <- rownames(SubjectFile)

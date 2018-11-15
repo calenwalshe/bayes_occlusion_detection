@@ -3,6 +3,7 @@ library(ggplot2)
 library(purrr)
 library(purrrlyr)
 library(tidyr)
+summarize <- dplyr::summarize
 
 summary.raw.data <- raw.data %>%
   group_by(SUBJECT, BIN, TARGET, ECCENTRICITY) %>%

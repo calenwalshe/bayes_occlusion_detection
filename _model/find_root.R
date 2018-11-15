@@ -132,11 +132,11 @@ find_root_ordered <- function(mean1, mean2, cov1, cov2) {
   
   d <- -.5 * (t(mean1) %*% inv_cov1 %*% (mean1)) - .5 * log(det(cov1)) + .5 * (t(mean2) %*% inv_cov2 %*% (mean2)) + .5 * log(det(cov2))
   
-  y_min <- min(c(mean1[2] - 3*sqrt(cov1[2,2]), mean2[2] - 3*sqrt(cov2[2,2])))
-  y_max <- max(c(mean1[2] + 3*sqrt(cov1[2,2]), mean2[2] + 3*sqrt(cov2[2,2])))
+  y_min <- min(c(mean1[2] - sqrt(cov1[2,2]), mean2[2] - sqrt(cov2[2,2])))
+  y_max <- max(c(mean1[2] + sqrt(cov1[2,2]), mean2[2] + sqrt(cov2[2,2])))
   
-  z_min <- min(c(mean1[3] - 3*sqrt(cov1[3,3]), mean2[3] - 3*sqrt(cov2[3,3])))
-  z_max <- max(c(mean1[3] + 3*sqrt(cov1[3,3]), mean2[3] + 3*sqrt(cov2[3,3])))    
+  z_min <- min(c(mean1[3] - sqrt(cov1[3,3]), mean2[3] - sqrt(cov2[3,3])))
+  z_max <- max(c(mean1[3] + sqrt(cov1[3,3]), mean2[3] + sqrt(cov2[3,3])))    
   
   g <- function(y,z) {
     term1 <- (-b_1 * y - b_2 * z - c_1)
@@ -269,7 +269,7 @@ find_roots_optim <- function(start_val = c(0,0,0), mean1, mean2, cov1, cov2) {
   
   #result <- optim(start_val[2:3], g, lower = c(y_min, z_min), upper = c(y_max, z_max), method = "L-BFGS-B")
   
-  result <- DEoptim(g, lower = c(y_min, z_min), upper = c(y_max, z_max))
+  result <- DEoptim(g, lower = c(y_min, z_min), upper = c(y_max, z_max), control = list(relto = .001))
   root.val <- find_single_root(y = result$optim$bestmem[1], z = result$optim$bestmem[2])
   
   d1 <- dmvnorm(root.val[1,], mean1, cov1, log = T)
@@ -387,7 +387,7 @@ find_roots_optim_ordered <- function(start_val = c(0,0,0), mean1, mean2, cov1, c
   
   #result <- optim(start_val[2:3], g, lower = c(y_min, z_min), upper = c(y_max, z_max), method = "L-BFGS-B")
   
-  result <- DEoptim(g, lower = c(y_min, z_min), upper = c(y_max, z_max))
+  result <- DEoptim(g, lower = c(y_min, z_min), upper = c(y_max, z_max),control = list(relto = .001))
   root.val <- find_single_root(y = result$optim$bestmem[1], z = result$optim$bestmem[2])
   
   d1 <- dmvnorm(root.val[1,], mean1, cov1, log = T)
@@ -406,3 +406,5 @@ find_roots_optim_ordered <- function(start_val = c(0,0,0), mean1, mean2, cov1, c
     return(c(reorder.2, d2))
   }
 }
+
+

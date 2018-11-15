@@ -201,7 +201,7 @@
     
     #result <- optim(start_val[2:3], g, lower = c(y_min, z_min), upper = c(y_max, z_max), method = "L-BFGS-B")
     
-    result <- DEoptim(g, lower = c(y_min, z_min), upper = c(y_max, z_max), DEoptim.control(reltol = 10e-4))
+    result <- DEoptim(g, lower = c(y_min, z_min), upper = c(y_max, z_max), DEoptim.control(reltol = 10e-2))
     root.val <- find_single_root(y = result$optim$bestmem[1], z = result$optim$bestmem[2])
     
     d1 <- dmvnorm(root.val[1,], mean1, cov1, log = T)

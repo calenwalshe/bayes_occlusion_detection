@@ -23,6 +23,7 @@ get_human_responses <-
       arrange(SUBJECT, TARGET, BIN, statType, SESSION, ECCENTRICITY) %>%
       as_tibble()
     
+    human_data %>% rename(SUBJECT = observer)
     return(human_data)
   }
 
@@ -31,6 +32,8 @@ get_human_detect <- function(human_data) {
   if (missing(human_data)) {
     error("Missing human data")
   }
+  
+  source('~/Dropbox/Calen/Work/occluding/detection_model_analysis/_model/import_model.R')
   experiment_bin_values <- get_experiment_bin_values()
   
   human_detect <- human_data %>%
@@ -70,7 +73,7 @@ get_model_detect <- function(model_data) {
   
   model_detect <- model_data %>%
     group_by(SUBJECT, ECCENTRICITY, BIN, TARGET) %>%
-    summarize(
+    dplyr::summarize(
       hit = sum(HIT == 1) / (sum(HIT == 1) + sum(MISS == 1)),
       miss = sum(MISS == 1) / (sum(MISS == 1) + sum(HIT == 1)),
       falsealarm = sum(FALSEALARM == 1) / (sum(FALSEALARM == 1) + sum(CORRECTREJECTION == 1)),
@@ -132,7 +135,7 @@ plot_publication_thresholds <-
     
     human.threshold.1 <- human.thresholds %>%
       group_by(TARGET, BIN, SUBJECT) %>%
-      summarize(se = se, threshold = mean(threshold)) %>%
+      dplyr::summarize(se = se, threshold = mean(threshold)) %>%
       select(TARGET, BIN, threshold, SUBJECT, se) %>%
       as_tibble()
     
@@ -148,14 +151,14 @@ plot_publication_thresholds <-
     
     d.1 <- merge(threshold_values, bin_values) %>%
       group_by(TARGET, BIN, statValue, statType, SUBJECT) %>%
-      summarize(se = se, threshold = mean(threshold), linetype = linetype) %>%
+      dplyr::summarize(se = se, threshold = mean(threshold), linetype = linetype) %>%
       filter(statType == statIn) %>%
       arrange(TARGET, BIN, SUBJECT)
     
     d.1$linetype <- as.factor(d.1$linetype)
     t.1.plot <-
       ggplot(data = d.1, aes(x = statValue, y = threshold,
-                             colour = SUBJECT, group = SUBJECT, linetype = linetype)) +
+                             colour = SUBJECT, group = SUBJECT)) +
       geom_point(size = 2) +
       geom_line(size = 1.25) +
       facet_wrap(~ TARGET) +
@@ -175,5 +178,5 @@ plot_publication_thresholds <-
         geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = .025)
     }
     plot(t.1.plot)
-    ggsave(t.1.plot, file = paste0('~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/vss_2018/', statIn, "_thresholds.pdf"), scale= 1.35)
+    ggsave(t.1.plot, file = paste0('~/Dropbox/Calen/Work/occluding/detection_model_analysis/presentations/', statIn, "_thresholds.pdf"), scale= 1.35)
   }

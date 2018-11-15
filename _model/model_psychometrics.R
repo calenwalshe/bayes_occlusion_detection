@@ -1,57 +1,84 @@
 #' Compute eccentricity psychometric functions for the model responses
 #'
+#' @param model.dprime 
+#' @param scale.dprime 
 get_model_psychometric <- function(model.dprime, scale.dprime = 1) {
   library(bbmle)
   library(dplyr)
   library(purrr)
+  library(Hmisc)
+  library(DEoptim)
   
-  model.dprime <- model.dprime %>% 
-    mutate(dprime = dprime * scale.dprime) %>%
-    mutate(percent_correct = pnorm(dprime/2)) %>%
-    select(BIN, TARGET, eccentricity, dprime, SUBJECT) %>%
-    unique()
+  model.dprime.nest <- model.dprime %>% 
+    group_by(TARGET, BIN, observer, sub_type) %>% 
+    nest()
   
-  fitted <- model.dprime %>% 
-    as_tibble() %>%
-    group_by(BIN, TARGET, SUBJECT) %>%
-    arrange(eccentricity) %>%
-    mutate(d0 = max(dprime)) %>%
-    group_by(BIN, TARGET, SUBJECT, d0) %>%
+  dprime.models <- map(model.dprime.nest$data, function(data) {
+    
+    e0_start <- approxExtrap(data$dprime, data$eccentricity, 0)$y / 2
+    
+    max_dprime <- max(data$dprime)
+    
+    f <- function(x) {
+      e0 <- x[1]
+      b <- x[2]
+      dprime_obs <- data$dprime
+      eccentricity <- data$eccentricity
+      
+      dprime_hat <- max(data$dprime) * e0^b/(e0^b + eccentricity^b)
+      
+      sum((dprime_obs - dprime_hat)^2)
+    }
+    
+    fit <- DEoptim(f, lower = c(e0 = 0, b = 0), upper = c(e0 = 15, b = 3), control = list(trace = 0))
+    
+    
+    #fit <- mle2(dprime ~ dnorm(mean = 1/2 * d0 * e0^b/(e0^b + eccentricity^b), sd = 1), 
+    #     start = list(e0 = 10, b = 3, d0 = max_dprime), fixed = list(d0 = max_dprime),
+    #     data = data[,c("eccentricity", "dprime")] %>% data.frame())
+    
+    
+    coef.fit <- data.frame(d0 = max_dprime, as.list(fit$optim$bestmem))
+  })
+
+  model.dprime.nest$models <- dprime.models
+  
+  model.dprime.nest$BIN <- factor(model.dprime.nest$BIN)
+  model.dprime.nest$TARGET <- factor(model.dprime.nest$TARGET)
+  
+  model.return <- model.dprime.nest %>% 
+    unnest(models)
+}
+
+#' A dataframe with dprime at human eccentricity threshold
+#'
+#' @param psychometric 
+#' @param eccentricity 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_dprime_at_eccentricity <- function(model.psychometrics, human.psychometrics) {
+  
+  human.thresholds.strip <- human.psychometrics %>% select(BIN, observer, TARGET, threshold) %>% rename(SUBJECT = observer)
+  
+  threshold.frame <- left_join(model.psychometrics, human.thresholds.strip, by = c("TARGET", "BIN"))
+  
+  dprime.at.threshold <- threshold.frame %>% group_by(TARGET, BIN, observer, sub_type, SUBJECT) %>%
     nest() %>%
-    mutate(models = map(data, function(x) { 
-      model <- mle2(dprime ~ dnorm(max(dprime) * e0^b/(e0^b + eccentricity^b), sd = 1),
-                     start = list(b = 2, e0 = 10),
-                     data = x)
-    })) %>%
+    mutate(dprime_at_threshold = map(data, function(x) {
+      d0 <- x$d0
+      e0 <- x$e0
+      b <- x$b
+      
+      threshold <- x$threshold
+      
+      dprime.at.threshold <- d0 * e0^b / (e0^b + threshold^b)
+      
+    })) %>% 
+    unnest(dprime_at_threshold) %>%
     select(-data)
   
-  fitted.params <- fitted %>%
-    mutate(params = map(models, coef), 
-           b = map(params, c(1)),
-           e0 = map(params, c(2)),
-           gamma = 0) %>%
-    select(-models, -params) %>%
-    unnest()
-  
-  return(fitted.params)
+  model.psychometrics <- model.psychometrics %>% left_join(., dprime.at.threshold, by = c("TARGET", "BIN", "observer", "sub_type"))
 }
-
-fit.scaled.thresholds <- function(human.psychometrics, model.dprime) {
-  
-  human.thresholds <- get_threshold(human.psychometrics) %>%
-    select(TARGET, SUBJECT, BIN, threshold)
-  
-  f <- function(a) {
-    pf <- get_model_psychometric(model.dprime, a)
-    
-    model <- pf %>% arrange(TARGET, BIN, SUBJECT) %>% get_threshold(.) %>%
-      select(TARGET, SUBJECT, BIN, threshold) %>% full_join(human.thresholds, ., by = c("TARGET", "BIN"))
-    
-    obj <- sum((model$threshold.x - model$threshold.y)^2)
-  }
-  
-  m1 <- optimize(f, lower = c(a = .001), upper = c(a = .25))
-  
-  return(m1$minimum)
-}
-

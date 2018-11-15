@@ -12,19 +12,29 @@ plot_dprime <- function(dprime.df) {
 }
 
 # Visualize the efficiency of the human observers.
-plot_efficiency <- function(efficiency.df, plotType = 1) {
+plot_efficiency <- function(model.psychometrics, plotType = 1) {
   library(dplyr)
   library(ggplot2)
   library(tidyr)
   library(grid)
   
+  summarize <- dplyr::summarise
+  
+  source('~/Dropbox/Calen/Work/occluding/detection_model_analysis/_model/import_model.R')
+  
+  
+  bin.values <- get_experiment_bin_values()
+  
+  efficiency.df <- left_join(model.psychometrics, bin.values, by = c("TARGET", "BIN"))
+  
+  efficiency.df <- efficiency.df %>% mutate(efficiency = 1 / dprime_at_threshold) %>% group_by(TARGET, BIN, statType, statValue) %>% summarize(efficiency = mean(efficiency))
+  
+  
+  
   if(plotType == 1) { # cardinal axis
-    efficiency.by.stat <- efficiency.df %>% 
-      group_by(TARGET, statValue, statType) %>%
-      summarize(eff.avg = mean(efficiency))
     
     # Efficiency by statistic    
-    fig <- efficiency.by.stat %>%
+    fig <- efficiency.df %>%
       group_by(statType) %>%
       nest() %>%
       mutate(fig = map2(statType, data, function(statType, data) {
@@ -32,19 +42,21 @@ plot_efficiency <- function(efficiency.df, plotType = 1) {
         
         x.lab <- ifelse(statType == "Lvals", "Luminance (%)", ifelse(statType == "Cvals", "Contrast (RMS)", "Similarity"))
         
-        fig.1 <- ggplot(efficiency.df, aes(x = statValue, y = eff.avg, colour = TARGET)) +
+        fig.1 <- ggplot(efficiency.df, aes(x = statValue, y = efficiency, colour = TARGET)) +
           geom_point(size = 2.5) + 
           geom_line(size = 1.5) +
           theme_set(theme_bw(base_size = 35))  +# pre-set the bw theme.
           scale_color_brewer(name = "Target", palette = "Dark2") +
-          theme(aspect.ratio = 1, axis.title.y = element_text(angle = 0, vjust = .5), legend.key.height=unit(3,"line"),
-                panel.border = element_rect(size = 1),legend.position="none") +
+          theme(aspect.ratio = 1, axis.title.y = element_text(angle = 0, vjust = .5),
+                panel.border = element_rect(size = 1), legend.title=element_text(size=10), 
+                legend.text=element_text(size=9)) +
           expand_limits(x = c(0), y = c(0, .3)) +
           xlab(x.lab) +
-          ylab(expression(sqrt(eta)))
+          ylab(expression(sqrt(eta))) +
+        ggtitle(first(data$sub_type))
         
         plot(fig.1)
-        ggsave(file = paste0("~/Dropbox/Calen/Dropbox/efficiency.fig.", statType, ".statistic.pdf"))
+        ggsave(file = paste0("~/Dropbox/Calen/Dropbox/efficiency.fig.", statType, '.', first(data$model), ".statistic.pdf"))
       }))
 
     

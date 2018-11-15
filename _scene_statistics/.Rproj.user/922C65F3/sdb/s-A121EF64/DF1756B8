@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "library(dplyr)\nlibrary(ggplot2)\nlibrary(purrr)\nlibrary(purrrlyr)\nlibrary(tidyr)\nsummarize <- dplyr::summarize\n\nsummary.raw.data <- raw.data %>%\n  group_by(SUBJECT, BIN, TARGET, ECCENTRICITY) %>%\n  summarize(pc = sum(CORRECT) / n())\n\nlapply(c(\"vertical\", \"horizontal\", \"bowtie\", \"spot\"), FUN = function(x) {\n  \n  fig <- ggplot(summary.raw.data %>% filter(TARGET == x), aes(x = ECCENTRICITY, y = pc, colour = SUBJECT)) +\n    facet_wrap(~BIN, ncol = 4, scales = \"free_x\") + \n    geom_point() +\n    geom_line() + \n    theme(aspect.ratio = 1) +\n    coord_cartesian(ylim = c(.5, 1))\n  \n  ggsave(filename = paste0(\"~/Dropbox/Calen/Dropbox/psychometrics.raw-\", x, '.pdf'), device = \"pdf\", plot = fig)\n})\n\n",
+    "created" : 1540916692184.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "630773688",
+    "id" : "DF1756B8",
+    "lastKnownWriteTime" : 1540844834,
+    "last_content_update" : 1540916739030,
+    "path" : "~/Dropbox/Calen/Work/occluding/detection_model_analysis/_human/visualize_raw_data.R",
+    "project_path" : null,
+    "properties" : {
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

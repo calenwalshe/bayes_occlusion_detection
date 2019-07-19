@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1541094773023.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "2|49|79|0|\n81|57|167|0|\n",
+    "hash" : "0",
+    "id" : "F0042093",
+    "lastKnownWriteTime" : 1541094866,
+    "last_content_update" : 1541094866426,
+    "path" : "~/Dropbox/Calen/Work/occluding/detection_model_analysis/_model/find_root.R",
+    "project_path" : "_model/find_root.R",
+    "properties" : {
+        "cursorPosition" : "271,19",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

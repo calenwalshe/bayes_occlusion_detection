@@ -1,0 +1,195 @@
+human.psychometrics <- function() {
+  library(curry)
+  summarize <- dplyr::summarise
+  
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/export_responses.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/human_psychometrics_tools.R')
+  
+  # Maximum Likelihood Function
+  f.mle <- function(d0, e0, b, gamma, data) {
+    eccentricity      <- data$eccentricity
+    HIT               <- data$HIT
+    CORRECTREJECTION  <- data$CORRECTREJECTION
+    FALSEALARM        <- data$FALSEALARM
+    MISS              <- data$MISS  
+    
+    sample <- (1 / 2 * (-1 + (HIT |
+                                CORRECTREJECTION) * 2) * d0 * e0 ^ b / (e0 ^ b + eccentricity ^ b) - (-1 + (HIT |
+                                                                                                              FALSEALARM) * 2) * gamma)
+    
+    -sum(pnorm(sample, mean = 0, sd = 1, log.p = T))  
+  }
+  
+  raw.data <- export.responses()
+  
+  data.grouped <- raw.data %>%
+    rename(eccentricity = ECCENTRICITY) %>%
+    group_by(TARGET, SUBJECT, BIN) %>%
+    select(-c("LEVEL", "TPRESENT", "PATCHID")) %>%
+    filter(TRIAL != 1) %>%
+    nest()
+  
+  f.partial <- map(data.grouped$data, function(x) {
+    f.curry <- curry::partial(f.mle, list(data = x))
+  })
+  
+  data.grouped$f.partial <- f.partial
+  
+  data.grouped$data <- map(data.grouped$data, function(x) x %>% group_by(eccentricity) %>% summarize(pc = mean(CORRECT), dprime = qnorm(mean(HIT)) - qnorm(mean(FALSEALARM))))
+  
+  #### All parameters free to vary ####
+  all.free <- lapply(data.grouped$f.partial, FUN= function(x) {
+    
+    deoptim.mle <- function(params) {
+      e0 <- params[1]
+      b <- params[2]
+      gamma <- params[3]
+      d0 <- params[4]
+      
+      x(e0 = e0, b = b, gamma = gamma, d0 = d0)
+    }
+    
+    DEoptim(deoptim.mle, lower = c(e0 = 0, b = 0, gamma = -5, d0 = 0), upper = c(e0 = 25, b = 100, gamma = 5, d0 = 20))
+  })
+  
+  all.free.params <- map(all.free, c(1,1))
+  
+  #### Find best fit for a grouped d0 ####
+  # Contains parameters for fitting.
+  param.frame <- data.grouped[, 1:5]
+  param.frame$params <- all.free.params
+  
+  param.frame$params <- map(param.frame$params, function(x) {
+    data.frame(as.list(x))
+  })
+  
+  param.frame <- param.frame %>% unnest(params)
+  
+  plot_psychometric(param.frame %>% mutate(observer = SUBJECT))
+  
+  #### END ####
+  
+  #### Fit model with fixed d0 ####
+  
+  param.frame.1 <- param.frame %>%
+    group_by(SUBJECT) %>%
+    mutate(d0 = mean(d0))
+  
+  # Fit the function
+  level.1.params.frame <- by_row(param.frame.1, function(row) {
+    x <- row$f.partial[[1]]
+    
+    deoptim.mle <- function(params) {
+      e0 <- params[1]
+      b <- params[2]
+      gamma <- params[3]
+      d0 <- params[4]
+      
+      x(e0 = e0, b = b, gamma = gamma, d0 = d0)
+    }
+    
+    d0.fixed <- row$d0[[1]]
+    #b.fixed  <- row$b[[1]]
+    
+    optim.eval <- DEoptim(deoptim.mle, lower = c(e0 = 0, b = 0, gamma = -5, d0 = d0.fixed), upper = c(e0 = 25, b = 100, gamma = 5, d0 = d0.fixed))
+  }, .to = "params")
+  
+  level.1.params <- map(level.1.params.frame$params, c(1,1))
+  
+  param.frame.1 <- data.grouped[, 1:5]
+  
+  param.frame.1$params <- level.1.params
+  
+  param.frame.1$params <- map(param.frame.1$params, function(x) {
+    data.frame(as.list(x))
+  })
+  
+  param.frame.1 <- param.frame.1 %>% unnest(params)
+  
+  plot_psychometric(param.frame.1 %>% mutate(observer = SUBJECT))
+  
+  #### END ####
+  
+  #### Find best fit for a grouped e0 ####
+  # Contains parameters for fitting.
+  param.frame.2 <- param.frame.1 %>% 
+    group_by(BIN) %>%
+    mutate(b = mean(b))
+  
+  # Fit the function
+  level.2.params.frame <- by_row(param.frame.2, function(row) {
+    x <- row$f.partial[[1]]
+    
+    deoptim.mle <- function(params) {
+      e0 <- params[1]
+      b <- params[2]
+      gamma <- params[3]
+      d0 <- params[4]
+      
+      x(e0 = e0, b = b, gamma = gamma, d0 = d0)
+    }
+    
+    d0.fixed <- row$d0[[1]]
+    b.fixed  <- row$b[[1]]
+    
+    optim.eval <- DEoptim(deoptim.mle, lower = c(e0 = 0, b = b.fixed, gamma = -5, d0 = d0.fixed), upper = c(e0 = 25, b = b.fixed, gamma = 5, d0 = d0.fixed))
+  }, .to = "params")
+  
+  level.2.params <- map(level.2.params.frame$params, c(1,1))
+  
+  param.frame.2 <- data.grouped[, 1:5]
+  
+  param.frame.2$params <- level.2.params
+  
+  param.frame.2$params <- map(param.frame.2$params, function(x) {
+    data.frame(as.list(x))
+  })
+  
+  param.frame.2 <- param.frame.2 %>% unnest(params)
+  
+  plot_psychometric(param.frame.2 %>% mutate(observer = SUBJECT))
+  
+  #### END ####
+  
+  #### Find best fit for a fixed e0 but allow all b to vary ####
+  # Contains parameters for fitting.
+  param.frame.3 <- param.frame.2
+  
+  # Fit the function
+  level.3.params.frame <- by_row(param.frame.2, function(row) {
+    x <- row$f.partial[[1]]
+    
+    deoptim.mle <- function(params) {
+      e0 <- params[1]
+      b <- params[2]
+      gamma <- params[3]
+      d0 <- params[4]
+      
+      x(e0 = e0, b = b, gamma = gamma, d0 = d0)
+    }
+    
+    e0.fixed <- row$e0[[1]]
+    d0.fixed <- row$d0[[1]]
+    gamma.fixed <- row$gamma[[1]]
+    
+    optim.eval <- DEoptim(deoptim.mle, lower = c(e0 = e0.fixed, b = 0, gamma = gamma.fixed, d0 = d0.fixed), upper = c(e0 = e0.fixed, b = 100, gamma = gamma.fixed, d0 = d0.fixed))
+  }, .to = "params")
+  
+  level.3.params <- map(level.3.params.frame$params, c(1,1))
+  
+  param.frame.3 <- data.grouped[, 1:5]
+  
+  param.frame.3$params <- level.3.params
+  
+  param.frame.3$params <- map(param.frame.3$params, function(x) {
+    data.frame(as.list(x))
+  })
+  
+  param.frame.3 <- param.frame.3 %>% unnest(params)
+  
+  plot_psychometric(param.frame.3 %>% mutate(observer = SUBJECT))
+  
+  final.params <- param.frame.2
+  
+  return(final.params)
+}

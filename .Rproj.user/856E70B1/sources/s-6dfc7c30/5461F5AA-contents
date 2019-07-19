@@ -1,0 +1,126 @@
+#' Optimize scalar on ideal
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_optim_scale <- function() {
+  library(dplyr)
+  library(DEoptim)
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometrics.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
+  
+  #load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometric.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/human.psychometrics.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_error.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
+
+  human.psychometrics.plot     <- human.psychometrics
+  human.psychometrics$observer <- "human"
+  
+  model.all <- model.error %>% mutate(pc = pnorm(dprime/2)) %>% select(BIN, TARGET, observer, SUBJECT, eccentricity,dprime) %>% filter(SUBJECT %in% c("optimal", "nocov", "1 0 0"))
+  
+  model.all$observer <- model.all$SUBJECT
+  model.all$SUBJECT <- NULL
+  
+  
+  model.mahal <- model.mahal %>% select(BIN, TARGET, observer, eccentricity, dprime)
+  
+  model.all <- rbind(model.all, model.mahal)
+  
+  models.unique <- unique(model.all$observer)
+  
+  model.subset <- model.all %>% select(BIN, TARGET, eccentricity, dprime, observer)
+
+
+  human.psychometrics.ave <- human.psychometrics %>% group_by(TARGET, BIN) %>% summarize(threshold = mean(threshold)) %>% mutate(observer = "ave")
+  
+  model.psychometric.optim <- get_model_psychometric(model.subset, 1)
+  
+  plot.model.psychometric(model.psychometric.optim)
+  
+  dprime.threshold <- get_dprime_at_eccentricity(model.psychometric.optim, human.psychometrics.ave) %>% mutate(z.unit = (dprime_at_threshold- mean(dprime_at_threshold))/sd(dprime_at_threshold))
+
+  model.subset$z.unit <- dprime.threshold$z.unit
+  
+  model.subset <- model.subset %>% filter(abs(z.unit) < 2)
+  
+  optim.scale <- lapply(models.unique, FUN = function(model_name) {
+    model <- model.subset %>% filter(observer == model_name)
+    
+    f.optim <- function(x) {
+      print(x)
+      model.psychometric.optim <- get_model_psychometric(model, x)
+      
+      dprime.threshold         <- get_dprime_at_eccentricity(model.psychometric.optim, human.psychometrics.ave)
+      
+      if(any(is.nan(dprime.threshold$dprime_at_threshold) | is.na(dprime.threshold$dprime_at_threshold))){
+        error <- NA
+      } else {
+        error <- mean(abs(dprime.threshold$dprime_at_threshold - 1))
+      }
+      return(error)
+    }
+    
+    optim.result <- optim(par = .1, f.optim, lower = .05, upper = .15, method = "Brent")
+    
+    min.val <- optim.result$par
+    
+    data.frame(observer = model_name, min.val)
+  })
+  
+  optim.scale.frame <- do.call(rbind, optim.scale)
+  
+  # create scaled psychometric functions
+  model.psychometrics.list <- mclapply(models.unique, FUN = function(x) {
+    model                     <- model.subset %>% filter(observer == x)
+    scale.val                 <- optim.scale.frame %>% filter(observer == x) %>% .[["min.val"]]
+    model.psychometric.scale  <- get_model_psychometric(model, scale.val)
+    model.psychometric.scale$scale <- scale.val
+    
+    return(model.psychometric.scale)
+    }, mc.cores = 10)
+  
+  model.psychometrics.scaled <- do.call(rbind, model.psychometrics.list)
+  save(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometrics.scaled.rdata", model.psychometrics.scaled)
+}
+
+get_optim_scale.1 <- function() {
+  library(dplyr)
+  library(DEoptim)
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometrics.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
+  
+  #load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometric.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/human.psychometrics.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_error.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/efficiency.rdata")
+  
+  human.psychometrics.ave <- human.psychometrics %>% group_by(TARGET, BIN) %>% summarize(threshold = mean(threshold)) %>% mutate(observer = "ave")  
+  
+  model.all <- model.error %>% mutate(pc = pnorm(dprime/2)) %>% select(BIN, TARGET, observer, SUBJECT, eccentricity,dprime)
+  
+  model.all$observer <- model.all$SUBJECT
+  model.all$SUBJECT <- NULL
+  
+  
+  model.mahal <- model.mahal %>% select(BIN, TARGET, observer, eccentricity, dprime)
+  
+  model.all <- rbind(model.all, model.mahal)  
+  
+  model.efficiency.ave <- model.efficiency %>% group_by(observer) %>% mutate(scale.val = scale(efficiency)) %>% filter(abs(scale.val) < 3) %>% summarize(efficiency = mean(efficiency))
+  
+  model.scale.vals <- merge(model.all, model.efficiency.ave) %>% as_tibble() %>% mutate(dprime = dprime * efficiency)
+  
+  model.psychometric.optim <- get_model_psychometric(model.scale.vals, 1)
+
+  model.psychometric.noextrap <- map(model.psychometric.optim$data, function(x) {
+    (((max(x$dprime) - 1) > -.2) & ((min(x$dprime) - 1) < .2))
+  })  
+    
+  model.psychometric.optim$bExtrap <- !unlist(model.psychometric.noextrap)
+
+  model.psychometrics.scaled <- model.psychometric.optim
+  save(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometrics.scaled.rdata", model.psychometrics.scaled)
+}

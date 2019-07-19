@@ -1,0 +1,208 @@
+# Produce Scene Statistics Figure
+plot.summary.statistics.cardinal <- function() {
+  library(tidyr)
+  library(ggplot2)
+  library(ggthemes)
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/plot_theme.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error.rdata")
+  
+  bin.values <- get_experiment_bin_values()
+  
+  values.df <- model.error %>%
+    select(TARGET, BIN, eccentricity,data_sd_vec_0, data_sd_vec_1, data_mean_vec_0, data_mean_vec_1)
+  
+  values.df$edge.sd.abs <- map(values.df$data_sd_vec_0, 1)
+  values.df$mean.sd.abs <- map(values.df$data_sd_vec_0, 2)
+  values.df$pattern.sd.abs <- map(values.df$data_sd_vec_0, 3)
+  
+  values.df$edge.mean.abs <- map(values.df$data_mean_vec_0, 1)
+  values.df$mean.mean.abs <- map(values.df$data_mean_vec_0, 2)
+  values.df$pattern.mean.abs <- map(values.df$data_mean_vec_0, 3)
+  
+  values.df$edge.sd.pres <- map(values.df$data_sd_vec_1, 1)
+  values.df$mean.sd.pres <- map(values.df$data_sd_vec_1, 2)
+  values.df$pattern.sd.pres <- map(values.df$data_sd_vec_1, 3)
+  
+  values.df$edge.mean.pres <- map(values.df$data_mean_vec_1, 1)
+  values.df$mean.mean.pres <- map(values.df$data_mean_vec_1, 2)
+  values.df$pattern.mean.pres <- map(values.df$data_mean_vec_1, 3)  
+  
+  values.df <- values.df %>% select(-contains("data"))
+  
+  values.df <- values.df %>% gather("name","value",4:15)
+  
+  values.df <- values.df %>% separate(name, c("cue", "statistic", "bPresent"))
+  
+  values.df <- left_join(values.df, bin.values, by = c("TARGET", "BIN"))
+  
+  values.df$value <- do.call(rbind, values.df$value)
+  
+  #values.df <- values.df %>% mutate(value = ifelse(statistic == "sd", value^2, value))
+  
+  #values.df[values.df$statistic == "sd", "statistic"] <- "var"
+  
+  values.df$cue <- factor(values.df$cue, levels = c("edge", "mean", "pattern"), labels = c("Edge", "Luminance", "Pattern"))
+  values.df$statType <- factor(values.df$statType, levels = c("Lvals", "Cvals", "Svals"), labels = c("Luminance", "Contrast", "Similarity"))
+  values.df$statistic <- factor(values.df$statistic, levels = c("mean", "sd"), labels = c("Mean", "Standard Deviation"))
+  
+  values.fovea <- values.df %>% filter(eccentricity == 0)
+  
+  
+  to_string <- as_labeller(c(`Luminance` = "Luminance (%)", `Contrast` = "Contrast (RMS)", `Similarity` = "Similarity", `Mean` = "Mean", `Standard Deviation` = "Standard Deviation"))
+  
+  invis.dat.lum <- values.df %>% filter(statistic == "Mean", cue == "Luminance") %>% group_by(statistic) %>% mutate(value = list(c(min(value), max(value)))) %>% unnest()
+  invis.dat.edge <- values.df %>% filter(cue == "Edge") %>% group_by(statistic) %>% mutate(value = list(c(min(value), max(value)))) %>% unnest()
+  invis.dat.pat <- values.df %>% filter(cue == "Pattern") %>% group_by(statistic) %>% mutate(value = list(c(min(value), max(value)))) %>% unnest()
+  
+
+  lapply(c(0, 11), FUN = function(x) {
+    
+    palettes <- ggthemes_data[["tableau"]][["color-palettes"]][["regular"]]
+    
+    colours.targets <- palettes$`Tableau 10`$value
+    
+    values.eccentricity <- values.df %>% filter(round(eccentricity) == x)
+    
+    invis.lum  <- invis.dat.lum %>% mutate(bPresent = ifelse(bPresent == "abs", "Absent", "Present")) %>% filter(round(eccentricity) == x)
+    invis.edge <- invis.dat.edge %>% mutate(bPresent = ifelse(bPresent == "abs", "Absent", "Present")) %>% filter(round(eccentricity) == x)
+    invis.pat <- invis.dat.pat %>% mutate(bPresent = ifelse(bPresent == "abs", "Absent", "Present")) %>% filter(round(eccentricity) == x)
+    
+    
+    values.eccentricity$value[values.eccentricity$statistic == "Standard Deviation"] <- (values.eccentricity$value[values.eccentricity$statistic == "Standard Deviation"])
+    
+    values.eccentricity           <- values.eccentricity %>% mutate(bPresent = ifelse(bPresent == "abs", "Absent", "Present"))
+    
+    
+    width.fig <- 4.5
+    height.fig = 4.5
+    
+    panel.border.sz <- 1
+    tick.sz         <- 1
+    axis.text.sz    <- 8
+    panel.text.sz   <- 8
+    point.sz        <- 1
+    
+    theme_set(theme_bw())
+    theme_update(aspect.ratio = 1, 
+                 axis.ticks = element_line(size = tick.sz),
+                 panel.background = element_rect(fill = "white"),
+                 #axis.ticks.length=unit(tick.length, "cm"),
+                 #axis.text.x = element_text(margin=unit(axis.text.shift.x, "cm")), 
+                 #axis.text.y = element_text(margin=unit(axis.text.shift.y, "cm")),
+                 axis.text = element_text(size = panel.text.sz),
+                 panel.grid.major = element_blank(), 
+                 panel.grid.minor = element_blank(),
+                 legend.title=element_blank(),
+                 legend.text = element_text(size = 1),
+                 legend.key.size = unit(10, "pt"),
+                 panel.border = element_rect(fill=NA, colour = "#19181A", size=panel.border.sz),
+                 plot.title = element_text(hjust = 0.5),
+                 legend.key=element_blank(),
+                 strip.placement = "outside",
+                 strip.background  = element_blank(),
+                 strip.text = element_text(size = panel.text.sz))
+    
+    
+    
+    # Luminance
+    fig.lum <- ggplot(values.eccentricity %>% filter(cue == "Luminance"), aes(x = statValue, y = ((value)), colour = TARGET, shape = bPresent, linetype = TARGET)) + 
+      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      geom_point(size = point.sz) +
+      geom_point(data = invis.lum, x = NA, size = 1) +
+      geom_line(size = .5) +
+      ggtitle(paste0("Luminance Cue", " ", x, "\U00B0")) +
+      scale_color_manual(values = colours.targets) +
+      guides(colour = "none", shape = "none", linetype = "none") +
+      xlab("") +
+      ylab("")
+    
+    plot(fig.lum)
+    
+    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'luminance_', x, '.pdf'), plot = fig.lum, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    
+    # Edge Cue
+    fig.edge <- ggplot(values.eccentricity %>% filter(cue == "Edge"), aes(x = statValue, y = ((value)), colour = TARGET, shape = bPresent, linetype = TARGET)) + 
+      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      geom_point(size = point.sz) +
+      geom_point(data = invis.edge, x = NA) +
+      geom_line(size = .5) +
+      ggtitle(paste0("Edge Cue", " ", x, "\U00B0")) +
+      scale_color_manual(values = colours.targets) +
+      guides(colour = "none", shape = "none", linetype = "none") +
+      xlab("") +
+      ylab("")
+    
+    plot(fig.edge)
+    
+    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'edge_', x, '.pdf'), plot = fig.edge, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    
+    # Pattern Cue
+    fake.dat <- values.eccentricity %>% filter(cue == "Pattern") %>% group_by(statistic) %>% mutate(value = list(c(min(value), max(value)))) %>% unnest()
+    fig.pattern <- ggplot(values.eccentricity %>% filter(cue == "Pattern"), aes(x = statValue, y = ((value)), colour = TARGET, shape = bPresent, linetype = TARGET)) + 
+      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      geom_point(size = point.sz) +
+      geom_point(data = invis.pat, x = NA) +
+      geom_line(size = .5) +
+      ggtitle(paste0("Pattern Cue", " ", x, "\U00B0")) +
+      scale_color_manual(values = colours.targets) +
+      guides(colour = "none", shape = "none", linetype = "none") +      
+      xlab("") +
+      ylab("")    
+    
+    plot(fig.pattern)
+    
+    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'pattern_', x, '.pdf'), plot = fig.pattern, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    
+    ## ONLY USED TO PRINT LEGEND AND AXIS TEXT
+    theme_update(axis.text = element_text(size = 10),
+                 strip.text = element_text(size = 10),
+                 legend.text = element_text(size = 10),
+                 legend.key.width = unit(.75,"cm"))      
+    
+    ##
+    
+    fig.lum.axis <- ggplot(values.eccentricity %>% filter(cue == "Luminance"), aes(x = statValue, y = ((value)), colour = TARGET, shape = bPresent, linetype = TARGET, group = TARGET)) + 
+      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      geom_point(size = point.sz) +
+      geom_point(data = invis.lum, x = NA) +
+      geom_line(aes(colour = TARGET, shape = bPresent), size = .5) +
+      ggtitle(paste0("Luminance Cue", " ", x, "\U00B0")) +
+      scale_color_manual(values = colours.targets) +
+      xlab("") +
+      ylab("")
+    
+    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'luminance_axis_', x, '.pdf'), plot = fig.lum.axis, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    ##
+    
+    ##
+    fig.edge.axis <- ggplot(values.eccentricity %>% filter(cue == "Edge"), aes(x = statValue, y = ((value)), colour = TARGET, shape = bPresent, linetype = TARGET, group = TARGET)) + 
+      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      geom_point(size = point.sz) +
+      geom_point(data = invis.edge, x = NA) +
+      geom_line(aes(colour = TARGET, shape = bPresent), size = .5) +
+      ggtitle(paste0("Edge Cue", " ", x, "\U00B0")) +
+      scale_color_manual(values = colours.targets) +
+      xlab("") +
+      ylab("")
+    
+    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'edge_axis_', x, '.pdf'), plot = fig.edge.axis, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    ##    
+    
+    ##
+    fig.pattern.axis <- ggplot(values.eccentricity %>% filter(cue == "Pattern"), aes(x = statValue, y = ((value)), colour = TARGET, shape = bPresent, linetype = TARGET, group = TARGET)) + 
+      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      geom_point(size = point.sz) +
+      geom_point(data = invis.pat, x = NA) +
+      geom_line(aes(colour = TARGET, shape = bPresent), size = .5) +
+      ggtitle(paste0("Pattern Cue", " ", x, "\U00B0")) +
+      scale_color_manual(values = colours.targets) +
+      xlab("") +
+      ylab("")
+    
+    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'pattern_axis_', x, '.pdf'), plot = fig.pattern.axis, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    ##        
+    
+  })
+}
+

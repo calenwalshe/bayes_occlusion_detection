@@ -1,0 +1,72 @@
+#' Optimize scalar on ideal
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_optim_scale <- function() {
+  library(dplyr)
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometrics.R')
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/model.psychometrics.unscaled.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.all.rdata")
+
+  model.all <- model.all %>% filter(!BIN %in% c(1,2))
+  
+  dprime.threshold.1 <- dprime.threshold %>% 
+    mutate(dprime_delta = dprime_at_threshold - 1, dprime_delta_z = dprime_delta / sd(dprime_delta)) %>% 
+    filter(dprime_delta_z < 3) %>%
+    select(-dprime_delta, dprime_delta_z)  
+  
+
+  models.unique <- unique(model.all$SUBJECT)
+  
+  optim.scale <- mclapply(models.unique, FUN = function(model_name) {
+    model <- model.all %>% filter(SUBJECT == model_name)
+    
+    f.optim <- function(x) {
+      model.psychometric.optim <- get_model_psychometric(model, x)
+      dprime.threshold         <- get_dprime_at_eccentricity(model.psychometric.optim, human.psychometrics)
+      
+      error <- sqrt(sum(dprime.threshold$dprime_at_threshold - 1)^2)
+    }    
+    
+    optim.scale <- optim(.5, f.optim, method = "Brent", lower = 0, upper = 1)
+    
+    data.frame(SUBJECT = model_name, optim.scale$par)
+  }, mc.cores = 10)
+  
+  optim.val <- optim.scale$par
+  optim.scale.frame <- do.call(rbind, optim.scale)
+  
+  # create scaled psychometric functions
+  
+  model.psychometrics.list <- mclapply(models.unique, FUN = function(x) {
+    model                     <- model.all %>% filter(SUBJECT == x)
+    scale.val                 <- optim.scale.frame %>% filter(SUBJECT == x) %>% .[["optim.scale.par"]]
+    model.psychometric.scale  <- get_model_psychometric(model, scale.val)
+    model.psychometric.scale$scale <- scale.val
+    
+    return(model.psychometric.scale)
+    }, mc.cores = 10)
+  
+  
+  model.psychometrics.scaled <- do.call(rbind, model.psychometrics.list)
+  
+  model.thresholds  <- get_threshold(model.psychometrics.scaled)
+  human.thresholds  <- get_threshold(human.psychometrics)
+  
+  
+  model.thresholds$se <- 0
+  human.thresholds$se <- 0
+  model.thresholds$SUBJECT <- model.thresholds$sub_type
+  
+  
+  plot_publication_thresholds(human.thresholds = human.thresholds, model.thresholds = model.thresholds, statIn = "Lvals")
+  plot_publication_thresholds(human.thresholds = human.thresholds, model.thresholds = model.thresholds, statIn = "Cvals")
+  plot_publication_thresholds(human.thresholds = human.thresholds, model.thresholds = model.thresholds, statIn = "Svals")
+  
+  model.all %>% left_join(model.all, optim.scale.frame, by = c("SUBJECT"))
+}
+
+

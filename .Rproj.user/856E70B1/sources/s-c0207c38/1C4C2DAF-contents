@@ -1,0 +1,57 @@
+library(ggplot2)
+library(dplyr)
+library(R.matlab)
+
+amplitude <- seq(.15, .2, .01)
+search.vss.dframe <- readMat('~/Dropbox/Calen/Work/search/vss_2018_search_exp/export_data.mat')
+
+centerX <- 1920/2
+centerY <- 1080/2
+
+bCorrect <- search.vss.dframe$export.data[[1]]
+bCorrect.frame <- data.frame(bCorrect)
+tPresent <- search.vss.dframe$export.data[[3]]
+
+response <- search.vss.dframe$export.data[[2]]
+
+dim.vals <- dim(response)
+
+all.response <- lapply(1:dim.vals[3], FUN = function(x) {
+  new.frame <- data.frame(t(response[,,x]))
+  
+  new.frame$condition <- x
+  new.frame$trial.nr  <- 1:nrow(new.frame)
+  new.frame$bCorrect  <- bCorrect.frame[, x]
+  new.frame$tPresent  <- tPresent[, x]
+  names(new.frame) <- c("stim.pos.x", "stim.pos.y", "mouse.x", "mouse.y", "button", "amplitude", "trial.nr", "bCorrect", "tPresent")
+  
+  return(new.frame)
+})
+
+all.response <- do.call(rbind, all.response)
+
+all.response$type <- NA
+
+distance <- sqrt((all.response$stim.pos.x - all.response$mouse.x)^2 + (all.response$stim.pos.y - all.response$mouse.y)^2)
+
+all.response$type[all.response$button == 1 & all.response$tPresent == 1 & distance < 120] <- "hit"
+all.response$type[all.response$button == 1 & all.response$tPresent == 0] <- "fa"
+all.response$type[all.response$button == 3 & all.response$tPresent == 1] <- "miss"
+all.response$type[all.response$button == 1 & all.response$tPresent == 1 & distance > 120] <- "miss"
+all.response$type[all.response$button == 3 & all.response$tPresent == 0] <- "cr"
+
+all.response$dist.cent <- sqrt((all.response$stim.pos.x - centerX)^2 + (all.response$stim.pos.y - centerY)^2)
+
+all.response$amplitude <- factor(all.response$amplitude, levels = c(1,2,3,4,5), labels = amplitude)
+
+pc.dframe <- all.response %>% group_by(amplitude) %>% summarize(pc = mean(bCorrect))
+
+fig.psych <- ggplot(pc.dframe, aes(x = amplitude, y = pc)) + geom_point()
+ggsave(filename = '~/Dropbox/Calen/Dropbox/search.psycho.pdf', width = 10, height = 10, device = 'pdf')
+
+visualize.dat <- all.response %>% filter(type %in% c("miss", "fa"), amplitude %in% c(.17,.18,.19))
+
+fig.spatial <- ggplot(visualize.dat, aes(x = stim.pos.x, y = stim.pos.y, colour = type)) + geom_point() + expand_limits(x = c(960-1080/2, 960+1080/2), y = c(640 - 1080/2, 640 + 1080/2)) + theme(aspect.ratio = 1)  + theme_set(theme_gray(base_size = 22))
+ggsave(filename = '~/Dropbox/Calen/Dropbox/search.spatial.pdf', width = 20, height = 20, device = 'pdf')
+
+all.response %>% mutate(amp.group = ifelse(amplitude %in% c(.15, .16), 'low', 'high')) %>% filter(type %in% c("miss", "fa")) %>% group_by(amp.group, type) %>% summarize(distance = mean(dist.cent), sd = sd(dist.cent))

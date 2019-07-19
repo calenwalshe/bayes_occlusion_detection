@@ -1,0 +1,132 @@
+# Visualize the efficiency of the human observers.
+plot_efficiency <- function(model.psychometrics.efficiency, plotType = 1) {
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(grid)
+  
+  summarize <- dplyr::summarise
+  
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
+  
+  
+  bin.values <- get_experiment_bin_values()
+  
+  efficiency.df <- left_join(model.psychometrics.efficiency, bin.values, by = c("TARGET", "BIN"))
+  
+  efficiency.df <- efficiency.df %>% mutate(efficiency = 1 / dprime_at_threshold) %>% group_by(TARGET, BIN, SUBJECT, sub_type, statType, statValue) %>% summarize(efficiency = mean(efficiency))
+  
+  
+  
+  if(plotType == 1) { # cardinal axis
+    
+    # Efficiency by statistic    
+    fig <- efficiency.df %>%
+      group_by(statType) %>%
+      nest() %>%
+      mutate(fig = map2(statType, data, function(statType, data) {
+        efficiency.df <- data
+        
+        x.lab <- ifelse(statType == "Lvals", "Luminance (%)", ifelse(statType == "Cvals", "Contrast (RMS)", "Similarity"))
+        
+        fig.1 <- ggplot(efficiency.df, aes(x = statValue, y = efficiency, colour = TARGET)) +
+          geom_point(size = 2.5) + 
+          geom_line(size = 1.5) +
+          facet_grid(sub_type~SUBJECT) +
+          theme_set(theme_bw(base_size = 15))  +# pre-set the bw theme.
+          scale_color_brewer(name = "Target", palette = "Dark2") +
+          theme(aspect.ratio = 1, axis.title.y = element_text(angle = 0, vjust = .5),
+                panel.border = element_rect(size = 1), legend.title=element_text(size=10), 
+                legend.text=element_text(size=9)) +
+          expand_limits(x = c(0), y = c(0, .3)) +
+          xlab(x.lab) +
+          ylab(expression(sqrt(eta)))
+        
+        plot(fig.1)
+        ggsave(file = paste0("~/Dropbox/Calen/Dropbox/efficiency.fig.", statType, '.', first(data$model), ".statistic.pdf"))
+      }))
+
+   } else if(plotType == 2) {
+    efficiency.by.ecc <- efficiency.df %>% group_by(TARGET, eccentricity) %>% summarize(eff.avg = mean(efficiency))
+    
+    # Efficiency by statistic    
+    fig.1 <- ggplot(efficiency.by.ecc, aes(x = eccentricity, y = eff.avg, colour = TARGET)) +
+      geom_point(size = 2.5) + 
+      geom_line(size = 1.5) +
+      theme_set(theme_bw(base_size = 15)) +# pre-set the bw theme.
+      geom_point() + 
+      geom_line() +
+      scale_color_brewer(name = "Target", palette = "Dark2") +
+      theme(aspect.ratio = 1, axis.title.y = element_text(angle = 0, vjust = .5), legend.key.height=unit(3,"line"),
+            panel.border = element_rect(size = 1)) +
+      xlab("Eccentricity (º)") +
+      ylab(expression(sqrt(eta)))
+  
+    plot(fig.1)  
+    ggsave(file = "~/Dropbox/Calen/Dropbox/efficiency_eccentricity.pdf", width = 25, height = 25)
+   }
+  }
+
+#' Compute the efficiency of the optimal and human responses
+get_efficiency <- function(human.psychometric, optimal.observer) {
+  library(purrrlyr)
+  
+  model.dat <- optimal.observer %>%
+    select(SUBJECT, BIN, TARGET, eccentricity, dprime)
+  
+  human.dat <- human.psychometric %>%
+    select(SUBJECT, BIN, TARGET, d0, e0, b, gamma) %>%
+    mutate(e0 = as.numeric(e0))
+  
+  optim.human.dat <- merge(model.dat, human.dat, by = c("TARGET", "BIN"))
+
+  efficiency <- by_row(optim.human.dat, function(row) {
+    e0  <- row$e0
+    b   <- row$b
+    d0  <- row$d0
+    ecc <- row$eccentricity
+    
+    dprime.human <- d0 * e0^b/(e0^b + ecc^b)
+  }, .to = "dprime.human") %>%
+    unnest(dprime.human) %>%
+    mutate(efficiency = dprime.human/dprime) %>%
+    select(BIN, TARGET, eccentricity, efficiency) %>%
+    arrange(BIN, TARGET, eccentricity)
+
+  bin_labels <- get_experiment_bin_values()
+  efficiency <- merge(efficiency, bin_labels)
+  return(efficiency)
+}
+
+plot.model.psychometric <- function(model.psychometrics) {
+  library(ggplot2)
+
+  dprime.vals <- map(model.psychometrics$data, function(x) data.frame(eccentricity = x$eccentricity, dprime = x$dprime))
+  
+  
+  model.psychometrics$response <- dprime.vals
+  
+  map.observer <- model.psychometrics %>% group_by(TARGET, BIN, observer, sub_type) %>% nest()
+  
+  psychometric.dat <- map(map.observer$data, function(x) {
+    dprime_hat <- x$d0 * x$e0^x$b / (x$e0^x$b + seq(0, 23, .1)^x$b)
+    
+    data.frame(eccentricity = seq(0, 23, .1), dprime = dprime_hat)
+  })
+  
+  model.psychometrics$psychometric.dat <- psychometric.dat
+  
+  psychometric.dat.1 <- model.psychometrics %>% select(-response) %>% unnest(psychometric.dat)
+  psychometric.dat.2 <- model.psychometrics %>% select(-psychometric.dat) %>% unnest(response)
+  
+  fig.1 <- ggplot(data = psychometric.dat.1, aes(x = eccentricity, y = dprime, colour = sub_type)) + 
+    geom_line() + 
+    geom_point(data = psychometric.dat.2, aes(x = eccentricity, y = dprime, colour = sub_type)) + 
+    facet_wrap(TARGET ~ BIN, ncol = 4, scale = "free") + 
+    theme_set(theme_gray(base_size = 18)) +
+    theme(aspect.ratio = 1)
+  
+  ggsave(plot = fig.1, filename = "~/Dropbox/Calen/Dropbox/model.psychometrics.pdf", device = "pdf", width = 40, height = 30)
+}
+
+

@@ -1,0 +1,58 @@
+library(purrr)
+
+true.mu    <- 20
+sigma.var <- seq(1, 20, length.out = 5)
+n.samples  <- seq(10, 100, 10)
+b.norm     <- c(0,1)
+
+param.frame <- expand.grid(true.mu = true.mu, sigma.var = sigma.var, n.samples = n.samples, b.norm = b.norm)
+
+param.frame.data <- by_row(param.frame, function(x) {
+  n.rms <- 1000
+
+  noise.fixed <- seq(1,x$sigma.var,length.out = x$n.samples)
+  obs.sample <- replicate(n.rms, rnorm(x$n.samples, x$true.mu, noise.fixed))
+  
+  if(x$b.norm) {
+    sigma_hat <- apply(obs.sample, 1, var)
+    
+    
+    norm.val <- (1/sigma_hat) / sum(1/sigma_hat)
+    
+    obs.sample.1 <- sweep(obs.sample, 1, norm.val, "*")
+    
+    obs.sample.2 <- colSums(obs.sample.1)
+    
+    error <- mean((obs.sample.2 - true.mu)^2)
+  
+    }else{
+      
+      obs.sample.1 <- sweep(obs.sample, 1, 1/x$n.samples, "*")
+      
+      obs.sample.2 <- colSums(obs.sample.1)
+      
+      error <- mean((obs.sample.2 - true.mu)^2)
+  }
+  data.frame(error = error)
+}, .to = "simulate_col")
+
+param.frame.data.unnest <- param.frame.data %>%
+  unnest()
+
+param.frame.data.unnest$b.norm <- factor(param.frame.data.unnest$b.norm, levels = c(0,1), labels = c("No normalization", "Normalization"))
+
+
+library(wesanderson)
+fig <- ggplot(param.frame.data.unnest, aes(x = (sigma.var), y = log(error), colour = as.factor(n.samples))) + 
+  geom_point() + 
+  geom_line() + 
+  facet_grid(~ b.norm) + 
+  ggthemes::theme_solarized_2(base_size = 25) +
+  labs(colour="Number of samples") +
+  xlab("Maximum Sample Variance") +
+  scale_color_brewer(palette="Set3") +
+  ylab("Log Error (MSE)") +
+  theme(aspect.ratio = 1)
+
+ggsave(filename = '~/Dropbox/Calen/Dropbox/normalization.png', device = 'png', dpi = "retina", width = 20, height = 10)
+  

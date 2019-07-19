@@ -1,0 +1,164 @@
+library(Rmpfr)
+
+load('~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_wide.rdata')
+
+n.rows <- nrow(model.wide)
+
+model.wide.nocov <- model.wide
+model.wide.nocov$mod_cov0 <- map(model.wide$data_cov_mat_0, function(x) x * diag(3))
+model.wide.nocov$mod_cov1 <- map(model.wide$data_cov_mat_1, function(x) x * diag(3))
+model.wide.nocov$mod_mean0 <- model.wide.nocov$data_mean_vec_0
+model.wide.nocov$mod_mean1 <- model.wide.nocov$data_mean_vec_1
+model.wide.nocov$model.type <- "nocov"
+
+model.wide.optimal <- model.wide
+model.wide.optimal$mod_cov0 <- model.wide.nocov$data_cov_mat_0
+model.wide.optimal$mod_cov1 <- model.wide.nocov$data_cov_mat_1
+model.wide.optimal$mod_mean0 <- model.wide.nocov$data_mean_vec_0
+model.wide.optimal$mod_mean1 <- model.wide.nocov$data_mean_vec_1
+model.wide.optimal$model.type <- "optimal"
+
+valid.dim <- list(c(0,0,1), c(0,1,0), c(1,0,0), c(1,1,0), c(1,0,1), c(0,1,1))
+
+model.wide$model.type <- list("optimal")
+model.wide.nocov$model.type <- list("nocov")
+
+combination <- lapply(valid.dim, FUN = function(x) {
+    decode_dim      <- x
+    model.wide.diag <- model.wide %>%
+      rowwise() %>% 
+      mutate(mod_mean0 = list(data_mean_vec_0 * decode_dim), mod_mean1 = list(data_mean_vec_1 * decode_dim), mod_cov0 = list(diag(data_cov_mat_0[diag(3)==T] * decode_dim + !decode_dim)), mod_cov1 = list(diag(data_cov_mat_1[diag(3)==T] * decode_dim + !decode_dim))) %>%
+      mutate(model.type = list(decode_dim))
+})
+
+
+models.list <- list(model.wide.optimal, model.wide.nocov) %>% append(., combination)
+#models.list <- list(model.wide.optimal)
+
+model.measure <- lapply(models.list, FUN = function(model) {
+  n.row      <- nrow(model)
+  model.wide <- model
+  
+  errors <- mclapply(1:n.rows, FUN = function(x) {
+    print(x)
+    target_cov_0 <- model.wide$data_cov_mat_0[[x]]
+    target_mean_0 <- model.wide$data_mean_vec_0[[x]]
+    
+    target_cov_1 <- model.wide$data_cov_mat_1[[x]]
+    target_mean_1 <- model.wide$data_mean_vec_1[[x]]
+    
+    mod_cov1 <- model.wide$mod_cov0[[x]]
+    mod_cov2 <- model.wide$mod_cov1[[x]]
+    
+    mod_mean1 <- model.wide$mod_mean0[[x]]
+    mod_mean2 <- model.wide$mod_mean1[[x]]
+    
+    #target_cov <- diag(3)
+    #target_mean <- c(0,0,0)
+    
+    #mod_cov1 <- diag(3)
+    #mod_cov2 <- diag(3)
+    
+    #mod_mean1 <- c(0,0,0)
+    #mod_mean2 <- c(0,0,1)
+    
+    resolution <- 2^15
+    
+    return.val.1 <- polar.error(mod_mean1, mod_mean2, mod_cov1, mod_cov2, target_mean_0, target_cov_0, resolution = resolution, pr_a = .5)
+    return.val.2 <- polar.error(mod_mean2, mod_mean1, mod_cov2, mod_cov1, target_mean_1, target_cov_1, resolution = resolution, pr_a = .5)
+    
+    responses <- list(falsealarm = return.val.1, miss = return.val.2)
+  }, mc.cores = 16)
+  
+  model.wide$responses  <- errors
+
+  return(model.wide)
+})
+
+library(purrrlyr)
+library(purrr)
+library(tidyr)
+
+
+model.all <- do.call(rbind, model.measure)
+
+dprime.vals <- map(model.all$responses, function(x) {
+  miss <- x$miss
+  falsealarm <- x$falsealarm
+  if(miss < 1/2^32){
+    q_miss <- as.numeric(-sqrt(log(1/miss^2) - log(log(1/miss^2)) - log(2 * pi)))
+  } else{
+    miss <- as.numeric(miss)
+    q_miss <- qnorm(miss)
+  }
+  
+  if(falsealarm < 1/2^32){
+    q_fa <- as.numeric(-sqrt(log(1/falsealarm^2) - log(log(1/falsealarm^2)) - log(2 * pi)))
+  } else{
+    falsealarm <- as.numeric(falsealarm)
+    q_fa <- qnorm(falsealarm)
+  }
+  
+  dprime_hit_method <- -q_miss - q_fa
+  dprime_error_method <- -2*qnorm(as.numeric(log((x$miss + x$falsealarm)/2)), log.p = T)
+  list(dprime_hit_method, dprime_error_method)
+})
+
+model.all$dprime <- map(dprime.vals, 1)
+model.all <- model.all %>% unnest(dprime)
+
+model.all$sub_type <- model.all$model.type
+model.all$sub_type <- map(model.all$sub_type, function(x) paste(x, collapse = ' '))
+model.all$observer <- "model"
+
+model.all <- model.all %>% unnest(sub_type)
+model.all$SUBJECT <- model.all$sub_type
+
+
+
+scale.val <- .3
+model.psychometric <- get_model_psychometric(model.all, scale.val) 
+model.psychometric$SUBJECT <- model.psychometric$sub_type
+
+psychometric.compare <- model.psychometric %>% filter(SUBJECT %in% c("optimal", "nocov", "1 0 0", "0 1 0", "0 0 1"))
+human.responses <- export.responses()
+
+
+human.detect <- get_human_detect(human.responses) %>% select(BIN, TARGET, SUBJECT, eccentricity, dprime) %>% group_by(BIN, TARGET, eccentricity) %>% summarize(dprime = mean(dprime)) %>% mutate(SUBJECT = "human")
+
+human.psychometrics <- by_row(human.psychometrics, function(x) {
+  dprime <- data.frame(eccentricity = unique(model.all$eccentricity), dprime = x$d0 * (x$e0^x$b / (x$e0^x$b + unique(model.all$eccentricity))))
+}, .to = "dprime") %>% unnest(dprime) %>% group_by(TARGET, BIN, eccentricity) %>% summarize(dprime = mean(dprime)) %>% mutate(SUBJECT = "human")
+
+dprime.compare        <- model.all %>% filter(SUBJECT %in% c("optimal", "nocov", "1 0 0", "0 1 0", "0 0 1")) %>% select(BIN, TARGET, SUBJECT, eccentricity, dprime)
+
+dprime.compare.human <- rbind(human.psychometrics %>% 
+                                select(BIN, TARGET, dprime, eccentricity,  SUBJECT) %>% 
+                                as.data.frame() %>% filter(TARGET == "vertical"), dprime.compare %>% as.data.frame() %>% 
+                                filter(TARGET == "vertical"))
+
+plot.model.psychometric(psychometric.compare)
+
+ ggplot(dprime.compare.human, aes(x = eccentricity, y = (dprime), colour = SUBJECT)) + facet_wrap(~BIN, ncol =4, scales = "free_y") + theme(aspect.ratio = 1) + geom_point() + geom_line()
+
+ggsave(fig, path = "~/Dropbox/Calen/Dropbox/all_fig.pdf", width = 2, height = 2, units = "cm", device = "pdf")
+
+model.threshold <- get_threshold(model.psychometric)
+model.threshold$SUBJECT <- model.threshold$sub_type
+model.threshold$se <- 0
+
+threshold.compare <- model.threshold %>% filter(SUBJECT %in% c("optimal", "1 0 0", "0 1 0", "0 0 1"))
+plot_publication_thresholds(threshold.compare, threshold.compare, statIn = "Cvals")
+
+# Correlation
+dprime.compare.corr <- human.psychometrics %>% 
+  mutate(dprime.human = dprime) %>% 
+  select(-SUBJECT, -dprime) %>% 
+  left_join(., dprime.compare, by = c("TARGET", "BIN", "eccentricity")) %>% filter(eccentricity > 0) %>%
+  group_by(SUBJECT) %>%
+  group_by(BIN, TARGET, SUBJECT) %>%
+  summarize(dprime = mean(dprime), dprime.human = mean(dprime.human))
+  
+
+ggplot(dprime.compare.corr, aes(x = dprime, y = dprime.human, colour = BIN)) + geom_point() + facet_wrap(~SUBJECT, scales = "free")
+

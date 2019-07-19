@@ -1,0 +1,39 @@
+# Final Figures.  Human Responses.
+library(ggthemes)
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/")
+
+psychometric.values <- human.psychometrics %>% 
+  group_by(TARGET, SUBJECT, BIN) %>%
+  nest()
+
+psychometric.values$pc_hat <- map(psychometric.values$data, function(parameters) {
+  d0    <- parameters$d0
+  e0    <- parameters$e0
+  b     <- parameters$b
+  gamma <- parameters$gamma
+  
+  x <- seq(0, 24, .1)
+  
+  f <- function(x, d0, e0, b, gamma) {
+    dprime <- d0 * e0^b / (e0^b + x^b)
+    pc     <- (pnorm(dprime/2 - gamma) + (1 - pnorm(-dprime/2 - gamma)))/2
+  } 
+  
+  f.1 <- Vectorize(f, vectorize.args = "x")
+  
+  data.frame(eccentricity  = x, percent_correct = f.1(x, d0, e0, b, gamma))
+
+  })
+  
+psychometric.line       <- psychometric.values %>% unnest(pc_hat) %>% filter(BIN == 3)
+psychometric.empirical  <- human.psychometrics %>% unnest(data) %>% select(TARGET, SUBJECT, BIN, eccentricity, pc) %>% rename(percent_correct = pc) %>% filter(BIN == 3)
+
+base.plot <- ggplot(psychometric.line, aes(x = eccentricity, y = percent_correct, colour = SUBJECT)) + 
+  geom_line() + 
+  geom_point(data = psychometric.empirical, aes(x = eccentricity, y = percent_correct)) + 
+  facet_wrap(~TARGET)
+
+base.plot + theme(aspect.ratio = 1) + theme_fivethirtyeight()
+
+                                                                                                                   

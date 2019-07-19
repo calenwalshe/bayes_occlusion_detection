@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1563075811540.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "27E63179",
+    "lastKnownWriteTime" : 1563079093,
+    "last_content_update" : 1563079093327,
+    "path" : "~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/human_psychometrics_tools.R",
+    "project_path" : "_human/human_psychometrics_tools.R",
+    "properties" : {
+        "cursorPosition" : "115,0",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

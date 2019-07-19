@@ -1,0 +1,121 @@
+#' Compute optimal and no covariance models
+#' 
+#' @return
+#' @export
+#'
+#' @examples
+get_optimal_error <- function() {
+  library(purrrlyr)
+  library(purrr)
+  library(tidyr)  
+  library(Rmpfr)
+  
+  load('~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_wide.rdata')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/polar_error.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/polar_roots.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/regular_placement.R')
+  n.rows <- nrow(model.wide)
+  
+  # Convert to diagonal covariance
+  model.wide.nocov <- model.wide
+  model.wide.nocov$mod_cov0 <- map(model.wide$data_cov_mat_0, function(x) x * diag(3))
+  model.wide.nocov$mod_cov1 <- map(model.wide$data_cov_mat_1, function(x) x * diag(3))
+  model.wide.nocov$mod_mean0 <- model.wide.nocov$data_mean_vec_0
+  model.wide.nocov$mod_mean1 <- model.wide.nocov$data_mean_vec_1
+  model.wide.nocov$model.type <- "nocov"
+  
+  # Full covariance matrix
+  model.wide.optimal <- model.wide
+  model.wide.optimal$mod_cov0 <- model.wide.nocov$data_cov_mat_0
+  model.wide.optimal$mod_cov1 <- model.wide.nocov$data_cov_mat_1
+  model.wide.optimal$mod_mean0 <- model.wide.nocov$data_mean_vec_0
+  model.wide.optimal$mod_mean1 <- model.wide.nocov$data_mean_vec_1
+  model.wide.optimal$model.type <- "optimal"
+  
+  # Name models
+  model.wide$model.type <- list("optimal")
+  model.wide.nocov$model.type <- list("nocov")
+  
+  # Store in a list
+  models.list <- list(model.wide.optimal, model.wide.nocov)
+  
+  # Apply error routine to both classes of covariance structure
+  model.measure <- lapply(models.list, FUN = function(model) {
+    n.row      <- nrow(model) # determine number of rows for mclapply
+    
+    model.wide.row <- model # which class of model we compute
+    
+    # Run the error routine on each row
+    errors <- mclapply(1:n.row, FUN = function(x) {
+      
+      # store the vector of means and covariances in variables. 
+      target_cov_0  <- model.wide.row$data_cov_mat_0[[x]]
+      target_mean_0 <- model.wide.row$data_mean_vec_0[[x]]
+      
+      target_cov_1  <- model.wide.row$data_cov_mat_1[[x]]
+      target_mean_1 <- model.wide.row$data_mean_vec_1[[x]]
+      
+      mod_cov1 <- model.wide.row$mod_cov0[[x]]
+      mod_cov2 <- model.wide.row$mod_cov1[[x]]
+      
+      mod_mean1 <- model.wide.row$mod_mean0[[x]]
+      mod_mean2 <- model.wide.row$mod_mean1[[x]]
+      #
+      
+      # Resolution of the grid to compute errors over. Larger numbers are more precise but take longer to compute. Trial and error determines that 2^15 yeilds stable estimates of the error.
+      resolution <- 2^15
+      
+      # Error is determined separately for the two distributions.
+      return.val.1 <- polar.error(mod_mean1, mod_mean2, mod_cov1, mod_cov2, target_mean_0, target_cov_0, resolution = resolution, pr_a = .5)
+      return.val.2 <- polar.error(mod_mean2, mod_mean1, mod_cov2, mod_cov1, target_mean_1, target_cov_1, resolution = resolution, pr_a = .5)
+      
+      responses <- list(falsealarm = return.val.1, miss = return.val.2)
+    }, mc.cores = 16)
+    
+    model.wide.row$responses  <- errors
+    
+    return(model.wide.row)
+  })
+  
+  # Combine both classes of covariance structure into a single dataframe
+  model.all <- do.call(rbind, model.measure)
+  
+  # Compute dprime from error rates
+  dprime.vals <- map(model.all$responses, function(x) {
+    miss <- x$miss
+    falsealarm <- x$falsealarm
+    if(miss < 1/2^32){
+      q_miss <- as.numeric(-sqrt(log(1/miss^2) - log(log(1/miss^2)) - log(2 * pi)))
+    } else{
+      miss <- as.numeric(miss)
+      q_miss <- qnorm(miss)
+    }
+    
+    if(falsealarm < 1/2^32){
+      q_fa <- as.numeric(-sqrt(log(1/falsealarm^2) - log(log(1/falsealarm^2)) - log(2 * pi)))
+    } else{
+      falsealarm <- as.numeric(falsealarm)
+      q_fa <- qnorm(falsealarm)
+    }
+    
+    # Two methods. Dprime from percent correct and from hits and falsealarms. Similar results.
+    dprime_hit_method <- -q_miss - q_fa
+    dprime_error_method <- -2*qnorm(as.numeric(log((x$miss + x$falsealarm)/2)), log.p = T)
+    list(dprime_hit_method, dprime_error_method)
+  })
+  
+  # Extract dprime only for method #1 (hits and falsealarms)
+  model.all$dprime <- map(dprime.vals, 1)
+  model.all <- model.all %>% unnest(dprime)
+  
+  # Name models and store
+  model.all$sub_type <- model.all$model.type
+  model.all$sub_type <- map(model.all$sub_type, function(x) paste(x, collapse = ' '))
+  model.all$observer <- "model"
+  
+  # Return models
+  model.all <- model.all %>% unnest(sub_type)
+  model.all$SUBJECT <- model.all$sub_type
+  
+  return(model.all)
+}

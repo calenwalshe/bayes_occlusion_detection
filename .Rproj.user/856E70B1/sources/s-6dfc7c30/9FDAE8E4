@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1563074683530.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "9FDAE8E4",
+    "lastKnownWriteTime" : 1563079512,
+    "last_content_update" : 1563079512533,
+    "path" : "~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/eccentricity_thresholds/plot_eccentricity_thresholds.R",
+    "project_path" : "_paper1figures/eccentricity_thresholds/plot_eccentricity_thresholds.R",
+    "properties" : {
+        "cursorPosition" : "66,0",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

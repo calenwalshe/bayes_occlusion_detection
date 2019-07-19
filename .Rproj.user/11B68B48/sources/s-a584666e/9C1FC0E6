@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1532613856841.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "9C1FC0E6",
+    "lastKnownWriteTime" : 1531853403,
+    "last_content_update" : 1532618178084,
+    "path" : "~/Dropbox/Calen/Work/occluding/detection_model_analysis/_human/export_responses.R",
+    "project_path" : "_human/export_responses.R",
+    "properties" : {
+        "cursorPosition" : "17,0",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

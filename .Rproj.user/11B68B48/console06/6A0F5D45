@@ -1,0 +1,11 @@
+]0;/mnt/home/calen/Dropbox/Calen/Work/search]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/search[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/search[00m$   rowwise() %>%
+bash: syntax error near unexpected token `%'
+]0;/mnt/home/calen/Dropbox/Calen/Work/search]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/search[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/search[00m$   mutate(std.cond = list(rbind(data.frame(type = c("edge", "luminance", "pattern"), TPRESENT = 0, std = sqrt(diag(data_cov_mat_0))), data.frame(type = c("edge", "luminance", "pattern"), TPRESENT = 1, std = sqrt(diag(data _cov_mat_1)))))) %>%
+bash: syntax error near unexpected token `std.cond'
+]0;/mnt/home/calen/Dropbox/Calen/Work/search]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/search[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/search[00m$   select(BIN, TARGET, eccentricity, std.cond) %>%
+bash: syntax error near unexpected token `('
+]0;/mnt/home/calen/Dropbox/Calen/Work/search]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/search[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/search[00m$   unnest(std.cond) %>%
+bash: syntax error near unexpected token `std.cond'
+]0;/mnt/home/calen/Dropbox/Calen/Work/search]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/search[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/search[00m$ bin.values <- get_experiment_bin_values()
+bash: syntax error near unexpected token `('
+]0;/mnt/home/calen/Dropbox/Calen/Work/search]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/search[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/search[00m$ 

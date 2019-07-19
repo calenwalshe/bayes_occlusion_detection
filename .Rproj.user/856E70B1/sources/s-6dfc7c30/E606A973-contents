@@ -1,0 +1,54 @@
+# Final Figures.  Human Responses.
+library(ggthemes)
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/optimal.model.all.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/model.psychometrics.scaled.rdata")
+
+model.psychometrics.scaled$data <- map(model.psychometrics.scaled$data, function(x) {
+  data <- x %>% select(eccentricity, dprime) %>% mutate(pc = pnorm(dprime/2))
+})
+
+model.psychometrics.scaled.1 <- model.psychometrics.scaled %>% 
+  mutate(SUBJECT = sub_type) %>% 
+  select(TARGET, SUBJECT, BIN, e0, data, b, d0, observer) %>% 
+  mutate(gamma = 0) %>%
+  filter(SUBJECT == "optimal")
+
+human.psychometrics.1        <- human.psychometrics %>% select(TARGET, SUBJECT, BIN, e0, data, b, d0, observer, gamma)
+
+combined.psychometrics <- rbind(model.psychometrics.scaled.1, human.psychometrics.1)
+
+psychometric.values <- combined.psychometrics %>% 
+  group_by(TARGET, SUBJECT, BIN) %>%
+  nest()
+
+psychometric.values$pc_hat <- map(psychometric.values$data, function(parameters) {
+  d0    <- parameters$d0
+  e0    <- parameters$e0
+  b     <- parameters$b
+  gamma <- parameters$gamma
+  
+  x <- seq(0, 24, .1)
+  
+  f <- function(x, d0, e0, b, gamma) {
+    dprime <- d0 * e0^b / (e0^b + x^b)
+    pc     <- (pnorm(dprime/2 - gamma) + (1 - pnorm(-dprime/2 - gamma)))/2
+  } 
+  
+  f.1 <- Vectorize(f, vectorize.args = "x")
+  
+  data.frame(eccentricity  = x, percent_correct = f.1(x, d0, e0, b, gamma))
+
+  })
+  
+psychometric.line       <- psychometric.values %>% unnest(pc_hat) %>% filter(BIN == 3)
+psychometric.empirical  <- combined.psychometrics %>% unnest(data) %>% select(TARGET, SUBJECT, BIN, eccentricity, pc) %>% rename(percent_correct = pc) %>% filter(BIN == 3)
+
+base.plot <- ggplot(psychometric.line, aes(x = eccentricity, y = percent_correct, colour = SUBJECT)) + 
+  geom_line() + 
+  geom_point(data = psychometric.empirical, aes(x = eccentricity, y = percent_correct)) + 
+  facet_wrap(~TARGET)
+
+base.plot + theme(aspect.ratio = 1) + theme_fivethirtyeight()
+
+                                                                                                                   

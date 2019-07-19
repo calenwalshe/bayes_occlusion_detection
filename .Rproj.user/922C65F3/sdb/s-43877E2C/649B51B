@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "#==============================================================================\n#title           : analysis_exp2.R\n#description     : Experiment 2 (luminance) model analysis.\n#author           :CW\n#date            :09032015\n#==============================================================================\n\n####< Packages\nrequire(dplyr)\nrequire(ggplot2)\n#>\n\n####< import data\nmodel_exp2 <- read.csv(file=\"./_data/model_dat.csv\",col.names=c(\"num_cancel\",\"condition\",\"fix_dur\",\"trial_id\",\"labile_active\",\"nonlabile_active\",\"BE_active\",\"execution_active\",\"timer_level_number\",\"labile_level_number\",\"nonlabile_level_number\",\"BE_level_number\",\"execution_level_number\",\"BE_labil_dur\",\"nlab_dur\"),colClasses = c(\"factor\",\"factor\",\"numeric\",\"factor\",\"factor\",\"factor\",\"factor\",\"factor\",\"numeric\",\"numeric\",\"numeric\",\"numeric\",\"numeric\",\"numeric\",\"numeric\"),header=FALSE)\n#>\n\n####<  prepare human data\nhuman_exp2 <- read.csv(file = \"./_data/h_fixdur_exp2.txt\",col.names = c(\"condition\",\"proportion\",\"fix_dur\"),header=F) #\nhuman_bin_fd <- human_exp2 %>% mutate(source = \"human\")\n#>\n\n####< prepare model data \nmodel_exp2 <- model_exp2 %>% filter(fix_dur < 1200)\nbreaks = seq(0,1200,60)\nlabels = factor(seq(30,1170,60))\nmodel_bin_fd <- model_exp2 %>% group_by(condition,fix_dur = cut(fix_dur, breaks,labels)) %>% summarize(num_obs = n()) %>% mutate(proportion = num_obs/sum(num_obs)) %>% mutate(source = \"model\") %>% select(-num_obs) %>% data.frame\n#>\n\nbin_fd <- rbind(model_bin_fd,human_bin_fd) #join human and model dataframes\n\n####< visualize fixation duration distribution\n# type: plot\n# description: human vs model - 1 condition per panel comparison\nggplot(bin_fd, aes(x = fix_dur, y = proportion,colour=source,group=source)) + geom_point() + geom_line() + facet_grid(~condition)\n# type: plot\n# description: human vs model - 3 condition per panel comparison\nggplot(bin_fd, aes(x = fix_dur, y = proportion,colour=condition,group=condition)) + geom_point() + geom_line() + facet_grid(~source)\n#>\n\n\n",
+    "created" : 1528150265717.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1800508372",
+    "id" : "649B51B",
+    "lastKnownWriteTime" : 1528150264,
+    "last_content_update" : 1528150264,
+    "path" : "~/Downloads/analysis_exp2.R",
+    "project_path" : null,
+    "properties" : {
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

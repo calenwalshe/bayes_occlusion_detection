@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "#title           :format_data.R\n#description     :Brings model data into an R suitable format.\n#author  \t       :CW\n#date            :09032015\n#notes           :See code book.\n#==============================================================================\n# ----- Code Book -----\n# num_cancel: the number of cancellations observed within the current fixation\n# condition: experimental condition\n# fix_dur: the observed fixation duration\n# trial_id: \n# labile_active: logical. whether the labile was active at the time of stimulus onset.\n# nonlabile_active: see previous\n# brain_eye_active: see previous\n# execution_active: see previous\n# timer_number: the level of the timer accumulator at the time of stimulus onset.\n# labile_number: see previous\n# nonlabile_number: see previous\n# execution_number: see previous\n# labile_duration: see previous\n# nonlabile_duration: see previous\n#==============================================================================\n# Import Packages #\nrequire(plyr)\n#\n\n## Model - Unaggregated\nmodel_exp2 <- read.csv('./_data/model_dat.csv',col.names=c(\"num_cancel\",\"condition\",\"fix_dur\",\"trial_id\",\"labile_active\",\"nonlabile_active\",\"brain_eye_active\",\"execution_active\",\"timer_number\",\"labile_number\",\"nonlabile_number\",\"brain_eye_number\",\"execution_number\",\"labile_duration\",\"nonlabile_duration\"),colClasses = c(\"factor\",\"factor\",\"numeric\",\"factor\",\"numeric\",\"numeric\",\"numeric\",\"numeric\",\"numeric\",\"numeric\",\"numeric\",\"numeric\"),header=FALSE)\n\nmodel_exp2 <- subset(model_exp2, fix_dur < 1200)\n\nlevels(model_exp2$condition) <- c(\"BASELINE\",\"UP\",\"DOWN\")\n\n## Save data ##\nwrite.csv(model_exp2,file=\"./_data/model_exp2\")\nsave(file=\"./_data/model_exp2\",model_exp2)\n",
+    "created" : 1528150671207.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2250121837",
+    "id" : "7FCC4E4E",
+    "lastKnownWriteTime" : 1496966689,
+    "last_content_update" : 1496966689,
+    "path" : "~/Dropbox/Calen/Work/PhD work/vision_research/format_data_1.R",
+    "project_path" : null,
+    "properties" : {
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

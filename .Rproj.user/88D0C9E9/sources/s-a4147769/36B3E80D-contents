@@ -1,0 +1,17 @@
+library(R.matlab)
+
+
+files.a <- list.files('/main/calen/occluding/images/ml_image_analysis/downsample_occlusion_patches/downsample/1/bowtie/3/', recursive = T, full.names = T)
+files.b  <- list.files('/main/calen/occluding/images/ml_image_analysis/downsample_occlusion_patches/downsample/1/bowtie/7/', recursive = T, full.names = T)
+
+save.path <- "/main/calen/occluding/images/ml_image_analysis/r_files/3/" 
+
+split.files <- split(x, ceiling(seq_along(x)/200))
+
+file.idx <- seq_along(split.files)
+block.files <- lapply(file.idx, FUN = function(idx) {
+  xx <- split.files[[idx]]
+  file.1 <- map(xx, readMat)
+  list.save <- list(file.1, file.name = xx)
+  save(file = paste0(save.path, idx, '.rdata'), list.save)
+})

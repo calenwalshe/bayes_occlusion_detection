@@ -1,0 +1,70 @@
+export.responses <- function(file_path = '~/Dropbox/Calen/Dropbox/experiment_settings/subject_out/periphery/') {
+
+# Import Subject Responses
+
+library(R.matlab)
+library(purrr)
+  
+files <- expand.grid(c("rcw", "sps", "yhb"), c("vertical", "horizontal", "bowtie", "spot"))
+
+all.response <- apply(files, 1,FUN = function(file) {
+  subject <- file[1]
+  target  <- file[2]
+  data <- readMat(paste0(file_path, as.character(target), '/', as.character(subject), '.mat'))
+  
+  SubjectFile <- data$SubjectExpFile
+  dataID <- rownames(SubjectFile)
+  
+  hit  <- SubjectFile[dataID == "hit"][[1]] %>%
+    as.data.frame.table()
+  
+  fa   <- SubjectFile[dataID == "falseAlarm"][[1]] %>%
+    as.data.frame.table()
+  
+  cr   <- SubjectFile[dataID == "correctRejection"][[1]] %>%
+    as.data.frame.table()
+  
+  miss <- SubjectFile[dataID == "miss"][[1]] %>%
+    as.data.frame.table()
+  
+  stimPos       <- SubjectFile[dataID == "stimPosDeg"][[1]] %>%
+    as.data.frame.table()
+  
+  fixPos       <- SubjectFile[dataID == "fixPosDeg"][[1]] %>%
+    as.data.frame.table()  
+  
+  correct      <- SubjectFile[dataID == "correct"][[1]] %>%
+    as.data.frame.table()
+  
+  stimuliIndex <- SubjectFile[dataID == "stimuliIndex"][[1]] %>%
+    as.data.frame.table()
+  
+  lookup <- unique(hit$Var1)
+  
+  response.mat <- apply(hit[,c(1,2,3,4)], 2, function(x) match(x, lookup))
+  
+  response.df <- data.frame(response.mat)
+  names(response.df) <- c("TRIAL", "LEVEL", "SESSION", "BIN")
+  
+  response.df$HIT                  <- hit[,5]
+  response.df$FALSEALARM           <- fa[,5]
+  response.df$MISS                 <- miss[, 5]
+  response.df$CORRECTREJECTION     <- cr[, 5]
+  response.df$ECCENTRICITY         <- stimPos[,5] - fixPos[,5]
+  response.df$CORRECT      <- correct[, 5]
+  response.df$PATCHID <- stimuliIndex[, 5]
+  response.df$SUBJECT      <- as.factor(subject)
+  response.df$TARGET       <- as.factor(target)
+  response.df$TPRESENT     <- ifelse(response.df$HIT == 1 | response.df$MISS == 1, 1, 0)
+  
+  response.df$BIN <- factor(response.df$BIN)
+  
+  response.df <- response.df %>%
+    as_tibble()
+  return(response.df)
+})
+
+subject.response <- do.call(rbind, all.response)
+}
+
+

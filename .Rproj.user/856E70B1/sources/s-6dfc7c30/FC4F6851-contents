@@ -1,0 +1,122 @@
+#' Optimize scalar on ideal
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_optim_scale <- function() {
+  library(dplyr)
+  library(DEoptim)
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometrics.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
+  
+  #load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometric.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/human.psychometrics.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
+
+  human.psychometrics.plot     <- human.psychometrics
+  human.psychometrics$observer <- "human"
+  
+  model.all <- model.error %>% mutate(pc = pnorm(dprime/2)) %>% select(BIN, TARGET, observer, SUBJECT, eccentricity,dprime) %>% filter(SUBJECT %in% c("optimal", "nocov"))
+  
+  model.all$observer <- model.all$SUBJECT
+  model.all$SUBJECT <- NULL
+  
+  
+  model.mahal <- model.mahal %>% select(BIN, TARGET, observer, eccentricity,dprime)
+  
+  model.all <- rbind(model.all, model.mahal)
+  
+  models.unique <- unique(model.all$observer)
+  
+  model.subset <- model.all %>% select(BIN, TARGET, eccentricity, dprime, observer)
+  
+  
+  # Remove conditions where thresholds cannot be measured in an effective way
+  #  This code scales all conditions by a scale factor. Then, the number of conditions
+  #  in which there is a measurable threshold are counted.
+  #  The scale factor with the largest number of measurable conditions is detected.
+  #  The conditions in which a threshold cannot be measured when the maximum number of
+  #  measureable thresholds hold are removed. 
+  #model.subset <- model.subset %>% filter(!BIN %in% c(1,2))
+  
+  model.subset <- lapply(models.unique, FUN = function(model_name) {
+    model <- model.subset %>% filter(observer == model_name)
+    
+    pair.vals <- lapply(seq(.01, 1, .001), FUN = function(x) {
+      model.1 <- model %>% mutate(dprime = dprime * x)
+     
+      model.2 <- model.1 %>% group_by(BIN, TARGET) %>% summarize(min_dprime = min(dprime), max_dprime = max(dprime), bGood = min_dprime < 1 & max_dprime > 1)
+      
+      c(x, sum(model.2$bGood))
+    })
+    
+    all.vals <- do.call(rbind, pair.vals)
+    
+    idx <- which.max(all.vals[,2])[1]
+    
+    pairs.good <- pair.vals[[idx]]
+    
+    model.good <- model %>% mutate(dprime = dprime * pairs.good[1])
+    model.good    <- model.good %>% group_by(BIN, TARGET) %>% mutate(min_dprime = min(dprime), max_dprime = max(dprime), bGood = (min_dprime < 1 & max_dprime > 1))
+    
+    model <- model[model.good$bGood, ]
+    
+    model.start <- model %>% mutate(model.start = pairs.good[1])
+    
+    return(model.start)
+  })
+  
+  model.subset <- do.call(rbind, model.subset)
+  
+  optim.scale <- mclapply(models.unique, FUN = function(model_name) {
+    model <- model.subset %>% filter(observer == model_name)
+    
+    f.optim <- function(x) {
+      print(x)
+      model.psychometric.optim <- get_model_psychometric(model, x)
+      
+      dprime.threshold         <- get_dprime_at_eccentricity(model.psychometric.optim, human.psychometrics)
+      
+      error <- sqrt(sum(dprime.threshold$dprime_at_threshold - 1)^2)
+      
+      if(any(is.nan(dprime.threshold$dprime_at_threshold) | is.na(dprime.threshold$dprime_at_threshold))){
+        error <- NA
+      }
+      
+      # Identify Extrapolation
+      bExtrap                  <- map(model.psychometric.optim$data, function(x) max(x$dprime >= 1) & min(x$dprime <= 1))
+      
+      if(sum(unlist(bExtrap)) > 0) {
+        error <- NA
+      }
+      
+      return(error)
+    }
+    
+    initial.val <- model$model.start[1]
+    optim.result <- optim(par = initial.val, f.optim, lower = .05, upper = .15, method = "L-BFGS-B")
+    
+    min.val <- optim.result$par
+    
+    data.frame(observer = model_name, min.val)
+  }, mc.cores = 3)
+  
+  optim.scale.frame <- do.call(rbind, optim.scale)
+  
+  # create scaled psychometric functions
+  model.psychometrics.list <- mclapply(models.unique, FUN = function(x) {
+    model                     <- model.all %>% filter(observer == x)
+    scale.val                 <- optim.scale.frame %>% filter(observer == x) %>% .[["min.val"]]
+    model.psychometric.scale  <- get_model_psychometric(model, scale.val)
+    model.psychometric.scale$scale <- scale.val
+    
+    return(model.psychometric.scale)
+    }, mc.cores = 10)
+  
+  model.psychometrics.scaled <- do.call(rbind, model.psychometrics.list)
+  save(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometrics.scaled.rdata", model.psychometrics.scaled)
+}
+
+

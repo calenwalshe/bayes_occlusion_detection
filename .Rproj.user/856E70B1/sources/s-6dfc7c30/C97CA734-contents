@@ -1,0 +1,21 @@
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/optimal.model.all.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/model.psychometrics.scaled.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/optim.scale.rdata")
+
+source("~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R")
+
+model.thresholds <- get_threshold(model.psychometrics.scaled)
+human.thresholds <- get_threshold(human.psychometrics)
+
+human.thresholds$se <- human.thresholds$sd_threshold
+model.thresholds$SUBJECT <- model.thresholds$sub_type
+
+model.thresholds.1 <- inner_join(model.thresholds, optim.scale[[2]], by = c("TARGET", "BIN", "observer", "sub_type"))
+
+model.thresholds.1 <- model.thresholds.1 %>% filter(SUBJECT == "optimal")
+model.thresholds.1$se <- 0
+
+plot_publication_thresholds(human.thresholds, model.thresholds.1, statIn = "Lvals")
+plot_publication_thresholds(human.thresholds, model.thresholds.1, statIn = "Cvals")
+plot_publication_thresholds(human.thresholds, model.thresholds.1, statIn = "Svals")

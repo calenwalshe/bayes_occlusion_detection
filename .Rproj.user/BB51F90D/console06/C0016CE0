@@ -1,0 +1,32 @@
+]0;/mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis[00m$ ls -al
+total 26656
+drwxrwxr-x 10 calen calen     4096 May 31 18:18 [0m[01;34m.[0m
+drwxrwxr-x 11 calen calen     4096 Mar  2 20:42 [01;34m..[0m
+drwxrwxr-x  2 calen calen     4096 May 23 15:36 [01;34m_data[0m
+-rw-rw-r--  1 calen calen      205 May 31 18:18 detection_model_analysis.Rproj
+drwxrwxr-x  2 calen calen     4096 May  1 10:08 [01;34medge_freq[0m
+-rw-rw-r--  1 calen calen     1529 May 28 09:39 extract_surround_stats.m
+drwxrwxr-x  2 calen calen     4096 May 17 18:11 [01;34m_human[0m
+drwxrwxr-x  3 calen calen     4096 May 30 20:39 [01;34m_model[0m
+drwxrwxr-x  3 calen calen     4096 Feb 14 22:55 [01;34m_optimal_window_size[0m
+drwxrwxr-x  3 calen calen     4096 May 30 20:44 [01;34mpresentations[0m
+-rw-rw-r--  1 calen calen        0 May 29  2017 .Rapp.history
+-rw-rw-r--  1 calen calen 27156556 Apr 17 11:20 .RData
+-rw-rw-r--  1 calen calen    22563 May 30 22:03 .Rhistory
+drwxrwxr-x  5 calen calen     4096 May 30 20:55 [01;34m.Rproj.user[0m
+drwxrwxr-x  5 calen calen     4096 May 25 21:58 [01;34m_scene_statistics[0m
+]0;/mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis[00m$ cd ..
+]0;/mnt/home/calen/Dropbox/Calen/Work/occluding]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/occluding[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/occluding[00m$ ls -al
+total 88
+drwxrwxr-x 11 calen calen 4096 Mar  2 20:42 [0m[01;34m.[0m
+drwxrwxr-x 18 calen calen 4096 May 30 14:58 [01;34m..[0m
+drwxrwxr-x  4 calen calen 4096 Aug 29  2017 [01;34m1_f_pilot[0m
+drwxrwxr-x  6 calen calen 4096 Mar  6 17:58 [01;34mdetection_model[0m
+drwxrwxr-x 10 calen calen 4096 May 31 18:18 [01;34mdetection_model_analysis[0m
+drwxrwxr-x  4 calen calen 4096 May 10 20:59 [01;34mexperiments[0m
+drwxrwxr-x  2 calen calen 4096 Feb 15 21:05 [01;34mimage_statistics[0m
+drwxrwxr-x  2 calen calen 4096 Aug 29  2017 [01;34mmisc[0m
+drwxrwxr-x 10 calen calen 4096 Apr 27 17:06 [01;34moccluding_scene_statistics[0m
+drwxrwxr-x  6 calen calen 4096 Apr 11 17:26 [01;34mplay_AMA[0m
+drwxrwxr-x  2 calen calen 4096 Jan  8 05:31 [01;34mscrap_bin[0m
+]0;/mnt/home/calen/Dropbox/Calen/Work/occluding]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/occluding[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/occluding[00m$ 

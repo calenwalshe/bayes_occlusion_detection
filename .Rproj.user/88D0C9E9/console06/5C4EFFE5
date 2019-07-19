@@ -1,0 +1,22 @@
+cd ]0;/mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis]0;calen@uni: /mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis[01;32mcalen@uni[00m:[01;34m/mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis[00m$ cd /main/al[K[Kcalen.o[K[K
+]0;/main/calen]0;calen@uni: /main/calen[01;32mcalen@uni[00m:[01;34m/main/calen[00m$ ls
+[0m[01;34mbackup_personal[0m  [01;34medward[0m           [01;34mkeras[0m      scene_stats.db  [01;34mtensorboard_logs[0m  [01;34mvsdi_nn[0m
+[01;34mdownsample[0m       [01;34mgoogle_video_dl[0m  [01;34moccluding[0m  sqldb           [01;34mtensorflow[0m        [01;34mYoutube-8M-WILLOW[0m
+]0;/main/calen]0;calen@uni: /main/calen[01;32mcalen@uni[00m:[01;34m/main/calen[00m$ cd occluding/
+]0;/main/calen/occluding]0;calen@uni: /main/calen/occluding[01;32mcalen@uni[00m:[01;34m/main/calen/occluding[00m$ ls
+[0m[01;34mimages[0m  ImgStatsGabor_periphery.mat  ImgStatsSearch.mat  [01;34msurround_prediction[0m
+]0;/main/calen/occluding]0;calen@uni: /main/calen/occluding[01;32mcalen@uni[00m:[01;34m/main/calen/occluding[00m$ cd iamges
+bash: cd: iamges: No such file or directory
+]0;/main/calen/occluding]0;calen@uni: /main/calen/occluding[01;32mcalen@uni[00m:[01;34m/main/calen/occluding[00m$ ls
+[0m[01;34mimages[0m  ImgStatsGabor_periphery.mat  ImgStatsSearch.mat  [01;34msurround_prediction[0m
+]0;/main/calen/occluding]0;calen@uni: /main/calen/occluding[01;32mcalen@uni[00m:[01;34m/main/calen/occluding[00m$ cd images
+]0;/main/calen/occluding/images]0;calen@uni: /main/calen/occluding/images[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images[00m$ ls
+[0m[01;34mdownsample_occlusion_patches[0m  [01;34mfiltered_db[0m  [01;34mimages_pht[0m  [01;34mImgStats[0m  [01;34mml_image_analysis[0m  [01;34mocclusion_patches[0m  [01;34mpink_noise[0m  [01;34mpixel_space[0m  [01;34msmall_im_db[0m
+]0;/main/calen/occluding/images]0;calen@uni: /main/calen/occluding/images[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images[00m$ cd ml_image_analysis/
+]0;/main/calen/occluding/images/ml_image_analysis]0;calen@uni: /main/calen/occluding/images/ml_image_analysis[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images/ml_image_analysis[00m$ ls
+[0m[01;34mbin_images[0m  [01;34mdownsample_occlusion_patches[0m
+]0;/main/calen/occluding/images/ml_image_analysis]0;calen@uni: /main/calen/occluding/images/ml_image_analysis[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images/ml_image_analysis[00m$ mkdir _[Kr_files
+]0;/main/calen/occluding/images/ml_image_analysis]0;calen@uni: /main/calen/occluding/images/ml_image_analysis[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images/ml_image_analysis[00m$ cd r_files
+]0;/main/calen/occluding/images/ml_image_analysis/r_files]0;calen@uni: /main/calen/occluding/images/ml_image_analysis/r_files[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images/ml_image_analysis/r_files[00m$ mkdir 3
+]0;/main/calen/occluding/images/ml_image_analysis/r_files]0;calen@uni: /main/calen/occluding/images/ml_image_analysis/r_files[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images/ml_image_analysis/r_files[00m$ mkdir 7
+]0;/main/calen/occluding/images/ml_image_analysis/r_files]0;calen@uni: /main/calen/occluding/images/ml_image_analysis/r_files[01;32mcalen@uni[00m:[01;34m/main/calen/occluding/images/ml_image_analysis/r_files[00m$ 

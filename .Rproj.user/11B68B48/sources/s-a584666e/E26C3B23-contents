@@ -1,0 +1,81 @@
+## Monkey 1
+data <- readMat(paste0('~/Dropbox/Calen/Work/orientation_dvc/APO.mat'))
+
+dat <- data$APO
+
+datID <- intersect(rownames(dat), c("Ao.All", "Bo.All"))
+
+orientation <- dat[rownames(dat) == "ORT"][[1]]
+SF          <- dat[rownames(dat) == "SF"][[1]]
+
+dat.all <- lapply(datID, FUN = function(x) {
+  category <- x
+  
+  cat.dat <- dat[which(rownames(dat) == category)][[1]]
+  
+  if(category == "Ao.All") {
+    DV <- dat[which(rownames(dat) == "vA.All")][[1]]
+  } else{
+    DV <- dat[which(rownames(dat) == "vB.All")][[1]]
+  }
+  
+  n.block <- length(cat.dat)
+  
+  all.category <- lapply(1:n.block, FUN = function(y) {data.frame(subject = "APO", category = category, orientation = orientation[y], sf = SF[y], block = y, response = as.numeric(cat.dat[[y]][[1]]), 
+    DV = as.numeric(DV[[y]][[1]]))})
+  
+  all.category <- do.call(rbind, all.category)
+})
+
+dat.all.APO <- do.call(rbind, dat.all)
+
+
+## Monkey 2
+data <- readMat(paste0('~/Dropbox/Calen/Work/orientation_dvc/BART.mat'))
+
+dat <- data$BART
+
+datID <- intersect(rownames(dat), c("Ao.All", "Bo.All"))
+
+orientation <- dat[rownames(dat) == "ORT"][[1]]
+SF          <- dat[rownames(dat) == "SF"][[1]]
+
+dat.all <- lapply(datID, FUN = function(x) {
+  category <- x
+  
+  cat.dat <- dat[which(rownames(dat) == category)][[1]]
+  
+  if(category == "Ao.All") {
+    DV <- dat[which(rownames(dat) == "vA.All")][[1]]
+  } else{
+    DV <- dat[which(rownames(dat) == "vB.All")][[1]]
+  }
+  
+  n.block <- length(cat.dat)
+  
+  all.category <- lapply(1:n.block, FUN = function(y) {data.frame(subject = "BART", category = category, orientation = orientation[y], sf = SF[y], block = y, response = as.numeric(cat.dat[[y]][[1]]), 
+                                                                  DV = as.numeric(DV[[y]][[1]]))})
+  
+  all.category <- do.call(rbind, all.category)
+})
+
+dat.all.BART <- do.call(rbind, dat.all)
+  
+
+# All behaviour
+behaviour <- rbind(dat.all.APO, dat.all.BART)
+
+behaviour <- behaviour %>% 
+  mutate(category = ifelse(category == "Ao.All", "A", "B"))
+
+behaviour$response <- as.character(behaviour$response)
+
+behaviour$response[behaviour$category == "A" & behaviour$response == "10"] <- "A"
+behaviour$response[behaviour$category == "A" & behaviour$response == "11"] <- "B"
+
+behaviour$response[behaviour$category == "B" & behaviour$response == "10"] <- "B"
+behaviour$response[behaviour$category == "B" & behaviour$response == "11"] <- "A"
+
+behaviour <- as_tibble(behaviour)
+
+

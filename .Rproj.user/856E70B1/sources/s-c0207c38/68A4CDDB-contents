@@ -1,0 +1,75 @@
+# play with priors
+
+load('~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/model_wide.rdata')
+
+test.dist.dframe <- model.wide %>% filter(TARGET == "vertical", eccentricity > 20)
+test.dist.dframe <- test.dist.dframe
+test.dist.dframe$mod_cov0 <- test.dist.dframe$data_cov_mat_0
+test.dist.dframe$mod_cov1 <- test.dist.dframe$data_cov_mat_1
+test.dist.dframe$mod_mean0 <- test.dist.dframe$data_mean_vec_0
+test.dist.dframe$mod_mean1 <- test.dist.dframe$data_mean_vec_1
+test.dist.dframe$model.type <- "optimal"
+test.dist.dframe.1 <- test.dist.dframe
+
+decode_dim <- c(1,0,0)
+test.dist.dframe.2 <- model.wide %>%
+  rowwise() %>% 
+  mutate(mod_mean0 = list(data_mean_vec_0 * decode_dim), mod_mean1 = list(data_mean_vec_1 * decode_dim), mod_cov0 = list(diag(data_cov_mat_0[diag(3)==T] * decode_dim + data_cov_mat_0[which(decode_dim == 1)]*!decode_dim)), mod_cov1 = list(diag(data_cov_mat_1[diag(3)==T] * decode_dim + data_cov_mat_1[which(decode_dim == 1)]*!decode_dim))) %>%
+  mutate(model.type = list(decode_dim))
+
+test.dist.dframe <- rbind(test.dist.dframe.1,test.dist.dframe.2)
+
+model.measure.prior <- lapply(seq(.2, .8, .1), FUN = function(prior) {
+  n.row      <- nrow(test.dist.dframe)
+  model.wide <- test.dist.dframe
+  
+  errors <- mclapply(1:n.row, FUN = function(x) {
+    print(x)
+    target_cov_0 <- model.wide$data_cov_mat_0[[x]]
+    target_mean_0 <- model.wide$data_mean_vec_0[[x]]
+    
+    target_cov_1 <- model.wide$data_cov_mat_1[[x]]
+    target_mean_1 <- model.wide$data_mean_vec_1[[x]]
+    
+    mod_cov1 <- model.wide$mod_cov0[[x]]
+    mod_cov2 <- model.wide$mod_cov1[[x]]
+    
+    mod_mean1 <- model.wide$mod_mean0[[x]]
+    mod_mean2 <- model.wide$mod_mean1[[x]]
+    
+    #target_cov <- diag(3)
+    #target_mean <- c(0,0,0)
+    
+    #mod_cov1 <- diag(3)
+    #mod_cov2 <- diag(3)
+    
+    #mod_mean1 <- c(0,0,0)
+    #mod_mean2 <- c(0,0,1)
+    
+    resolution <- 2^13
+    
+    return.val.1 <- polar.error(mod_mean1, mod_mean2, mod_cov1, mod_cov2, target_mean_0, target_cov_0, resolution = resolution, pr_a = prior)
+    return.val.2 <- polar.error(mod_mean1, mod_mean2, mod_cov1, mod_cov2, target_mean_1, target_cov_1, resolution = resolution, pr_a = prior)
+    return(1/2 * sum(return.val.1, return.val.2, na.rm = T))
+  }, mc.cores = 16)
+  
+  model.wide$error  <- errors
+  model.wide$dprime <- map(model.wide$error, 
+                           function(x) {-2 * qnorm(as.numeric(log(x)), log = T)})
+  
+  model.wide <- model.wide %>% 
+    unnest(dprime)
+  
+  model.wide$prior <- prior
+  
+  return(model.wide)
+})
+
+model.measure.prior.all <- do.call(rbind, model.measure.prior)
+
+model.measure.prior.all$model.type <- map(model.measure.prior.all$model.type, function(x) paste(x, collapse = ' ')) 
+model.measure.prior.all <- unnest(model.measure.prior.all, model.type)
+
+model.measure.prior.all <- filter(model.measure.prior.all, eccentricity > 20, TARGET == "vertical")
+
+ggplot(model.measure.prior.all, aes(x = BIN, y = dprime, colour = as.factor(prior))) + geom_point(position = "jitter") + facet_wrap(~model.type, ncol = 4) + theme(aspect.ratio = 1)

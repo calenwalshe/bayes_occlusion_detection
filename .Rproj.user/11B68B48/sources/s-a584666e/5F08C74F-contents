@@ -1,0 +1,71 @@
+---
+title: "Cue Covariances"
+output: html_notebook
+---
+
+
+
+```{r}
+load('~/Dropbox/Calen/Work/occluding/detection_model_analysis/_data/model_wide.rdata')
+bin.values <- get_experiment_bin_values()
+
+bin.values$BIN <- as.factor(bin.values$BIN)
+```
+
+```{r}
+model.std <- model.wide %>%
+  rowwise() %>%
+  mutate(std.cond = list(rbind(data.frame(type = c("edge", "luminance", "pattern"), TPRESENT = 0, std = sqrt(diag(data_cov_mat_0))), data.frame(type = c("edge", "luminance", "pattern"), TPRESENT = 1, std = sqrt(diag(data_cov_mat_1)))))) %>%
+  select(BIN, TARGET, eccentricity, std.cond) %>%
+  unnest(std.cond) %>%
+  inner_join(., bin.values, by = c("BIN", "TARGET"))
+```
+
+
+Do the cue reliabilities change in a regular and predictable fashion when moving from low luminance backgrounds to high luminance backgrounds. Failure to incorporate changes in cue reliability may result in decreased efficiency.
+```{r, fig.width=40}
+model.std.avg <- model.std %>% 
+  group_by(BIN,type, TPRESENT, statType, statValue, eccentricity) %>%
+  summarize(std.mean = sqrt(mean(std^2))) %>% filter(statType == "Lvals")
+
+model.std <- model.std.avg %>% ggplot(., aes(x = statValue, y = log(std.mean), colour = as.factor(type), linetype = as.factor(TPRESENT))) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(TPRESENT~eccentricity, nrow = 2, scales = "free_x") +
+  theme_set(theme_gray(base_size = 30)) +
+  theme(aspect.ratio = 1) +
+  xlab("Luminance")
+
+plot(model.std)
+
+ggsave(filename = '~/Dropbox/Calen/Dropbox/model.std.pdf', plot = model.std, width = 30)
+```
+
+```{r}
+human.responses <- export.responses()
+
+human.responses
+
+human.bias <- human.responses %>% filter(SUBJECT == "rcw") %>%
+  group_by(SUBJECT, TARGET, BIN, ECCENTRICITY) %>%
+  nest() %>%
+  mutate(bias = map(data, function(data) {
+    dat.format <- data %>% 
+      summarize(hr = sum(HIT == 1)/sum(TPRESENT == 1), far = sum(FALSEALARM == 1)/sum(TPRESENT ==0), dprime = qnorm(hr) - qnorm(far), bias = -(dprime/2 + qnorm(far)), bias = ifelse(is.infinite(bias), NaN, bias))
+    
+    return(dat.format)
+  })) %>%
+  unnest(bias) %>%
+  inner_join(., bin.values, by = c("BIN", "TARGET")) %>%
+  group_by(statValue, statType) %>%
+  summarize(bias_mu = mean(bias, na.rm = T)) + 
+  xlab("Luminance")
+
+fig <- human.bias %>% ggplot(., aes(x = statValue, y = bias_mu)) + geom_point() + facet_grid(~statType, scales = "free") + theme(aspect.ratio = 1)
+
+plot(fig)
+
+ggsave(filename = '~/Dropbox/Calen/Dropbox/bias.pdf', plot = fig, width = 20)
+
+```
+

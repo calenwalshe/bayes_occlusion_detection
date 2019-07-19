@@ -1,0 +1,73 @@
+# Final Figures.  Human Responses.
+library(ggthemes)
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/human.psychometrics.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometrics.scaled.rdata")
+
+model.psychometrics.scaled$data <- map(model.psychometrics.scaled$data, function(x) {
+  data <- x %>% select(eccentricity, dprime) %>% mutate(pc = pnorm(dprime/2))
+})
+
+model.psychometrics.scaled.1 <- model.psychometrics.scaled %>% 
+  select(TARGET, BIN, e0, data, b, d0, observer) %>% 
+  mutate(gamma = 0)
+
+human.psychometrics.1        <- human.psychometrics %>% select(TARGET, BIN, e0, data, b, d0, observer, gamma)
+
+combined.psychometrics <- rbind(model.psychometrics.scaled.1, human.psychometrics.1)
+
+psychometric.values <- combined.psychometrics %>% 
+  group_by(TARGET, observer, BIN) %>%
+  nest()
+
+psychometric.values$pc_hat <- map(psychometric.values$data, function(parameters) {
+  d0    <- parameters$d0
+  e0    <- parameters$e0
+  b     <- parameters$b
+  gamma <- parameters$gamma
+  
+  x <- seq(0, 24, .01)
+  
+  f <- function(x, d0, e0, b, gamma) {
+    dprime <- d0 * e0^b / (e0^b + x^b)
+    pc     <- (pnorm(dprime/2 - gamma) + (1 - pnorm(-dprime/2 - gamma)))/2
+  } 
+  
+  f.1 <- Vectorize(f, vectorize.args = "x")
+  
+  data.frame(eccentricity  = x, percent_correct = f.1(x, d0, e0, b, gamma))
+
+  })
+  
+psychometric.line       <- psychometric.values %>%
+  unnest(pc_hat) %>%
+  filter(BIN == 3) %>%
+  filter(observer %in% c("rcw", "sps", "yhb", "optimal"))
+
+psychometric.empirical  <- combined.psychometrics %>% unnest(data) %>% select(TARGET, observer, BIN, eccentricity, pc) %>% rename(percent_correct = pc) %>% filter(BIN == 3) %>% filter(observer %in% c("rcw", "sps", "yhb", "optimal"))
+
+psychometric.line$linetype <- as.factor(ifelse(psychometric.line$observer %in% c("rcw", "sps", "yhb"), "1", "2"))
+psychometric.empirical$linetype <- as.factor(ifelse(psychometric.empirical$observer %in% c("rcw", "sps", "yhb"), "1", "2"))
+
+psychometric.empirical$observer <- factor(psychometric.empirical$observer, levels = c("rcw", "sps", "yhb","optimal"), labels = c("rcw", "sps", "yhb", "Optimal"))
+psychometric.line$observer <- factor(psychometric.line$observer, levels = c("rcw", "sps", "yhb","optimal"), labels = c("rcw", "sps", "yhb", "Optimal"))
+
+
+
+base.plot <- ggplot(psychometric.line, aes(x = eccentricity, y = percent_correct,
+                                           colour = observer)) +
+  geom_line(size = 2) +
+  geom_point(data = psychometric.empirical, size = 3) + 
+  facet_wrap(~ TARGET) +
+  theme_set(theme_light(base_size = 30))  +# pre-set the bw theme.
+  theme.1 +
+  scale_linetype_manual("", labels = c("rcw", "sps", "esm", "Optimal"), values = c(1,1,1,2,2,2)) +
+  scale_colour_manual("", labels = c("rcw", "sps", "esm", "Optimal"), values=colour.vals) + xlab("Eccentricity (\U00B0)") + ylab("Percent Correct") + 
+  scale_x_continuous(breaks = seq(3, 23, length.out = 5)) +
+  scale_y_continuous(breaks = c(.5, .6, .7, .8, .9, 1))
+
+
+fig <- base.plot + theme(aspect.ratio = 1)
+
+ggsave(file = "~/Dropbox/Calen/Work/occluding/paper/figures/psychometrics/psychometric_single_bin.pdf", plot = fig, device = "pdf", scale = 2, useDingbats = FALSE)
+
+                                                                                                                   

@@ -1,0 +1,32 @@
+g <- function(n.good, p.bad, total.samples) {
+  n.good <- n.good
+  n.bad <- p.bad * n.good
+  
+  mu.snr.bad <- -log2(.99)
+  mu.snr.good <- 1/sqrt(10)
+  
+  snr.vector <- c(rep(mu.snr.bad, times = round(n.bad)), rep(mu.snr.good, round(n.good)))
+  
+  f <- function(n.samples) {
+    info.sample <- sample(snr.vector, n.samples, replace = F)
+  }
+  
+  info.samples <- replicate(1000, f(total.samples))
+  
+  mean(sqrt(colSums(info.samples^2)))
+}
+
+out.vals <- lapply(seq(0, 1, .01), FUN = function(x) g(100, x, 10))
+
+snr.frame <- data.frame(x = seq(0, 1, .01), y = unlist(out.vals))
+
+fig <- ggplot(snr.frame, aes(x = x, y = y)) + 
+  geom_line() + 
+  geom_point() + 
+  xlab("% low information") + 
+  ylab("Information") + 
+  theme_solarized() + 
+  theme(aspect.ratio = 1, text=element_text(size=20))
+
+ggsave(filename = '~/Dropbox/Calen/info.sample.pdf', device = "pdf", width = 10, height = 10)
+  

@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1563079530159.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "2617BE7",
+    "lastKnownWriteTime" : 1562812826,
+    "last_content_update" : 1562812826,
+    "path" : "~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/efficiency/compute_efficiency.R",
+    "project_path" : "_paper1figures/efficiency/compute_efficiency.R",
+    "properties" : {
+        "cursorPosition" : "87,0",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

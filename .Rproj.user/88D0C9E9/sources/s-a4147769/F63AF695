@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1541438148154.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2438126976",
+    "id" : "F63AF695",
+    "lastKnownWriteTime" : 1532114423,
+    "last_content_update" : 1532114423,
+    "path" : "~/Dropbox/Calen/Work/occluding/detection_model_analysis/_svm/basic_svm.R",
+    "project_path" : "_svm/basic_svm.R",
+    "properties" : {
+    },
+    "relative_order" : 7,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

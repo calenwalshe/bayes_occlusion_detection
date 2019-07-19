@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1541438489738.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "4052508137",
+    "id" : "4C6CC98A",
+    "lastKnownWriteTime" : 1525187293,
+    "last_content_update" : 1525187293,
+    "path" : "~/Dropbox/Calen/Work/occluding/detection_model_analysis/edge_freq/freq_analysis.R",
+    "project_path" : "edge_freq/freq_analysis.R",
+    "properties" : {
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

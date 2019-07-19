@@ -1,0 +1,192 @@
+#' Plot formatted and publication ready thresholds.
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot_eccentricity_thresholds <- function() {
+  
+  library(ggthemes)
+  
+  # Load and Source
+  source(
+    "~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/human_psychometrics_tools.R"
+  )
+  source("~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R")
+  load(
+    "~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometrics.scaled.rdata"
+  )
+  load(
+    "~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/human.psychometrics.rdata"
+  )
+  #
+  
+  model.thresholds  <- get_threshold(model.psychometrics.scaled)
+  human.thresholds  <- get_threshold(human.psychometrics)
+  
+  # Identify Extrapolation
+  # We're not going to plot any thresholds that were determined via extrapolation
+  bExtrap                  <-
+    map(model.thresholds$data, function(x)
+      ! any(x$dprime < 1))
+  model.thresholds$bExtrap <- bExtrap
+  
+  model.thresholds$se <- 0
+  human.thresholds$se <- human.thresholds$sd
+  
+  #model.thresholds$SUBJECT <- model.thresholds$sub_type
+  human.thresholds$SUBJECT <- NULL
+  
+  colour.vals <-
+    c("#5D001E",
+      "#E3AFBC",
+      "#EE4C7C",
+      "#31708E",
+      "#5085A5",
+      "#8FC1E3")
+  
+  model.thresholds.noextrap <-
+    model.thresholds %>% filter(bExtrap == 0)
+  
+  human.thresholds <-
+    human.thresholds %>% mutate(TARGET = factor(TARGET, levels = c(
+      "vertical", "horizontal", "bowtie", "spot"
+    )))
+  
+  model.thresholds <-
+    model.thresholds.noextrap %>% mutate(TARGET = factor(TARGET, levels = c(
+      "vertical", "horizontal", "bowtie", "spot"
+    )))
+  
+  human.threshold.1 <- human.thresholds %>%
+    group_by(TARGET, BIN, observer) %>%
+    dplyr::summarize(se = mean(se), threshold = mean(threshold)) %>%
+    select(TARGET, BIN, threshold, observer, se) %>%
+    as_tibble()
+  
+  model.threshold.1 <- model.thresholds %>%
+    select(TARGET, BIN, threshold, observer, se) %>%
+    as_tibble()
+  
+  threshold_values <- full_join(model.threshold.1, human.threshold.1)
+  
+  bin_values <- get_experiment_bin_values()
+  d.1        <- merge(threshold_values, bin_values) %>%
+    group_by(TARGET, BIN, statValue, statType, observer) %>%
+    dplyr::summarize(se = mean(se), threshold = mean(threshold)) %>%
+    arrange(TARGET, BIN, observer)
+  
+  d.1$linetype <-
+    as.factor(ifelse(d.1$observer %in% c("rcw", "sps", "yhb"), "1", "2"))
+  
+  d.1$observer <-
+    factor(
+      d.1$observer,
+      levels = c("rcw", "sps", "yhb", "optimal", "nocov", "mahalanobis"),
+      labels = c("rcw", "sps", "esm", "Optimal", "No Covariance", "Mahalanobis")
+    )
+  
+  ### PLOTTING ###
+  
+  axis.text.sz <- 8
+  axis.title.sz <- 12
+  tick.sz       <- 1
+  axis.ticks.length.sz = .1
+  legend.key.size <- 15
+  legend.text.size <- 10
+  panel.border.sz  <- 2
+  strip.text.sz    <- 12
+  legend.line.sz   <- 1
+  width.fig  <- 7
+  height.fig <- 7
+  
+  pt.sz <- 1
+  line.sz <- .5
+  
+  theme_set(theme_base())
+  theme_update(aspect.ratio = 1, 
+               axis.title = element_text(size = axis.title.sz),
+               plot.background = element_blank(),
+               axis.ticks = element_line(size = tick.sz),
+               axis.ticks.length = unit(axis.ticks.length.sz, "cm"),
+               panel.background = element_rect(fill = "white"),
+               #axis.ticks.length=unit(tick.length, "cm"),
+               #axis.text.x = element_text(margin=unit(axis.text.shift.x, "cm")), 
+               #axis.text.y = element_text(margin=unit(axis.text.shift.y, "cm")),
+               axis.text = element_text(size = axis.text.sz),
+               panel.grid.major = element_blank(), 
+               panel.grid.minor = element_blank(),
+               legend.title=element_blank(),
+               legend.text = element_text(size = legend.text.size),
+               legend.key.size = unit(legend.key.size, "pt"),
+               panel.border = element_rect(fill=NA, colour = "#19181A", size=panel.border.sz),
+               plot.title = element_text(hjust = 0.5),
+               #legend.key=element_blank(),
+               strip.text = element_text(size = strip.text.sz),
+               legend.key.width = unit(legend.line.sz,"cm"))
+  
+  # Luminance
+  breaks.luminance <- round(d.1[d.1$statType == "Lvals",]$statValue %>% unique(),0)
+  error.width <- (max(breaks.luminance) - min(breaks.luminance))/10
+  
+  t.1.plot <- d.1 %>% filter(statType == "Lvals") %>%
+    ggplot(data = ., aes(x = statValue, y = threshold,
+                         colour = interaction(observer, linetype), linetype = interaction(observer,linetype))) +
+    geom_point(size = pt.sz) +
+    geom_line(size = line.sz) +
+    facet_wrap(~ TARGET) +
+    xlab("Background Luminance (%)") +
+    ylab("Eccentricity Threshold (\U00B0)") +
+    geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = error.width) +
+    scale_linetype_manual("", labels = c("rcw", "sps", "esm","Optimal", "No Covariance", "Mahalanobis"), values = rep(c("solid", "dashed"), each = 3)) +
+    scale_colour_manual("", labels = c( "rcw", "sps", "esm","Optimal", "No Covariance", "Mahalanobis"), values=colour.vals) +
+    scale_x_continuous(breaks = breaks.luminance) +
+    scale_y_continuous(breaks = seq(0, 60, 20))
+  
+  plot(t.1.plot)  
+  ggsave(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/eccentricity_thresholds/_figures/threshold_luminance.pdf", t.1.plot, width = width.fig, height = height.fig, useDingbats=FALSE)
+  
+  # Contrast
+  breaks.contrast <- round(d.1[d.1$statType == "Cvals",]$statValue %>% unique(),2)*100
+  error.width <- (max(breaks.contrast) - min(breaks.contrast))/10
+  
+  t.1.plot <- d.1 %>% filter(statType == "Cvals") %>%
+    ggplot(data = ., aes(x = statValue*100, y = threshold,
+                         colour = interaction(observer, linetype), linetype = interaction(observer,linetype))) +
+    geom_point(size = pt.sz) +
+    geom_line(size = line.sz) +
+    facet_wrap(~ TARGET) +
+    expand_limits(x = c(0,1), y = c(0, 30)) + 
+    xlab("Background Contrast (%)") +
+    ylab("Eccentricity Threshold (\U00B0)") +
+    geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = error.width) +
+    scale_linetype_manual("", labels = c("rcw", "sps", "esm","Optimal", "No Covariance", "Mahalanobis"), values = rep(c("solid", "dashed"), each = 3)) +
+    scale_colour_manual("", labels = c( "rcw", "sps", "esm","Optimal", "No Covariance", "Mahalanobis"), values=colour.vals) +
+    scale_x_continuous(breaks = breaks.contrast) +
+    scale_y_continuous(breaks = seq(0, 32, 8))
+  
+  plot(t.1.plot)  
+  ggsave(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/eccentricity_thresholds/_figures/threshold_contrast.pdf", t.1.plot, width = width.fig, height = height.fig, useDingbats=FALSE)
+  
+  # Similarity
+  breaks.similarity <- round(d.1[d.1$statType == "Svals",]$statValue %>% unique(),2)
+  error.width <- (max(breaks.similarity) - min(breaks.similarity))/15
+  t.1.plot <- d.1 %>% filter(statType == "Svals") %>%
+    ggplot(data = ., aes(x = statValue, y = threshold,
+                         colour = interaction(observer, linetype), linetype = interaction(observer,linetype))) +
+    geom_point(size = pt.sz) +
+    geom_line(size = line.sz) +
+    facet_wrap(~ TARGET) +
+    expand_limits(x = c(.45,1), y = c(0, 25)) + 
+    xlab("Background Similarity") +
+    ylab("Eccentricity Threshold (\U00B0)") +
+    geom_errorbar(aes(ymin=threshold-se, ymax=threshold+se), width = error.width) +
+    scale_linetype_manual("", labels = c("rcw", "sps", "esm","Optimal", "No Covariance", "Mahalanobis"), values = rep(c("solid", "dashed"), each = 3)) +
+    scale_colour_manual("", labels = c( "rcw", "sps", "esm","Optimal", "No Covariance", "Mahalanobis"), values=colour.vals) +
+    scale_x_continuous(breaks = seq(.45, .95, .15)) +
+    scale_y_continuous(breaks = seq(0, 24, 6))
+  
+  plot(t.1.plot)  
+  ggsave(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/eccentricity_thresholds/_figures/threshold_similarity.pdf", t.1.plot, width = width.fig, height = height.fig, useDingbats=FALSE)
+}
+

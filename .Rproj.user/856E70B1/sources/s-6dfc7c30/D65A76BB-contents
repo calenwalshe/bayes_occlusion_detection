@@ -1,0 +1,27 @@
+a <- 1
+b <- 1
+c <- 1
+d <- 1
+e <- 1
+f <- 1
+g <- 2
+
+excite <- 1
+
+f.rate <- function(excite, suppress) {
+  (a + (b * excite^c - d * suppress^c) / (e * excite^c + f * suppress^c + 1))^g
+}
+
+suppress <- c(0, .25, .5, .75, 1)
+
+samples <- lapply(suppress, FUN = function(x) {
+  rate <- f.rate(1, x)
+  pois.spike <- rpois(1000, rate)
+  
+  data.frame(excite = 1, suppress = x, pois.spike = pois.spike)
+}
+)
+
+new.samples <- do.call(rbind, samples)
+
+ggplot(new.samples, x = )

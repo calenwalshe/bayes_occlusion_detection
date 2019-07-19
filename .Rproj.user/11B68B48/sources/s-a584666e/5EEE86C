@@ -1,0 +1,24 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1532624150758.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1198370859",
+    "id" : "5EEE86C",
+    "lastKnownWriteTime" : 1532628283,
+    "last_content_update" : 1532628283394,
+    "path" : "/mnt/home/calen/Dropbox/Calen/Work/orientation_dvc/notebooks/raw_data_visualization.rmd",
+    "project_path" : null,
+    "properties" : {
+        "chunk_output_type" : "inline",
+        "cursorPosition" : "13,0",
+        "scrollLine" : "14",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

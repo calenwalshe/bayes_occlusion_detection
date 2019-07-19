@@ -1,0 +1,144 @@
+#' Human psychometric fits.
+#'
+#' @return
+#' A dataframe with parameters for each subject, bin and target.
+#' @export
+#'
+#' @examples
+get_human_psychometrics <- function() {
+  library(bbmle)
+  library(broom)
+  
+  source(
+    '~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/export_responses.R'
+  )
+  
+  raw.data <- export.responses()
+  
+  data.grouped <- raw.data %>%
+    rename(e = ECCENTRICITY) %>%
+    group_by(BIN) %>%
+    filter(TRIAL != 1) %>%
+    nest()
+  
+  pnorm_ <- function(x, log.p = T) {
+    pnorm(x,
+          mean = 0,
+          sd = 1,
+          log.p = log.p)
+  }
+  
+  
+  models <- map(data.grouped$data, function(data) {
+    output <-
+      mle2(
+        (1 / 2 * (-1 + (HIT |
+                         CORRECTREJECTION) * 2) * 4.5 * e0 ^ b / (e0 ^ b + e ^ b)) ~ pnorm_(),
+        parameters = list(e0 ~ 0 + TARGET:SUBJECT),
+        start = list(e0 = 3.9, b = 1),
+        optimizer = "nlminb",
+        lower = rep(0, 13),
+        data = data
+      )
+  })
+  
+  data.grouped$models <- models
+  data.grouped$coef   <- map(data.grouped$models, tidy)
+  data.grouped        <- data.grouped %>% unnest(coef)
+  
+  data.grouped.1 <- data.grouped %>% extract(term, c("parameter"), "(e0|b)", remove = F) %>%
+extract(term, c("TARGET"), "(bowtie|vertical|horizontal|spot)", remove = F) %>%
+extract(term, c("SUBJECT"), "(sps|rcw|yhb)")
+  
+  data.grouped.2 <- split(data.grouped.1, data.grouped.1$parameter)
+  
+  expand.vals.b <- expand.grid(parameter = "b", TARGET = c("vertical", "horizontal", "bowtie", "spot"), SUBJECT = c("yhb", "sps", "rcw"))
+  data.grouped.b <- data.grouped.2$b %>% select(-SUBJECT, -TARGET) %>% left_join(., expand.vals.b, by = c("parameter"))
+  
+  
+  data.grouped.e0 <- data.grouped.2$e0
+  
+  all.params <- rbind(data.grouped.e0, rbind(data.grouped.b))
+  
+  all.params.1 <- all.params %>%
+    select(-std.error, -statistic, -p.value) %>%
+    spread(parameter, estimate) %>%
+    mutate(d0 = 4.5)
+  
+  human.detect <- get_human_detect(raw.data) %>% as_tibble() %>% group_by(BIN, TARGET, SUBJECT) %>% nest()
+  
+
+  data.return <- left_join(all.params.1, human.detect, by = c("BIN", "SUBJECT", "TARGET")) %>%
+    mutate(TARGET = factor(TARGET, levels = c("vertical", "horizontal", "bowtie", "spot")))
+  
+  data.return <- data.return %>% 
+    rename(observer = SUBJECT) %>%
+    get_threshold(.)
+}
+
+#' Title
+#'
+#' @return
+#' @export
+#'
+#' @examples
+bootstrap.psychometrics <- function(data, n_samples) {
+  library(bbmle)
+  library(broom)
+  
+  #allow only non-error results
+  boot.samples <- mclapply(1:n_samples, FUN = function(x) {
+    result = tryCatch({
+      f()
+    }, warning = function(w) {
+      NA
+    }, error = function(e) {
+      NA
+    }, finally = {
+      NA
+    })}, mc.cores = 16)
+  
+  f <- function() {
+    raw.data <- data %>%
+      group_by(SUBJECT, TARGET, BIN) %>%
+      sample_frac(1, replace = T)
+    
+    data.grouped <- raw.data %>%
+      rename(e = ECCENTRICITY) %>%
+      group_by(BIN, TARGET, SUBJECT) %>%
+      filter(TRIAL != 1) %>%
+      nest()
+    
+    pnorm_ <- function(x, log.p = T) {
+      pnorm(x,
+            mean = 0,
+            sd = 1,
+            log.p = log.p)
+    }
+    
+    
+    models <- map(data.grouped$data, function(data) {
+      output <-
+        mle2(
+          (1 / 2 * (-1 + (HIT |
+                            CORRECTREJECTION) * 2) * 4.5 * e0 ^ 1.8 / (e0 ^ 1.8 + e ^ 1.8)) ~ pnorm_(),
+          start = list(e0 = 5),
+          optimizer = "optim",
+          data = data
+        )
+    })
+    
+    data.grouped$models <- models
+    data.grouped$coef   <- map(data.grouped$models, tidy)
+    data.grouped        <- data.grouped %>% unnest(coef)
+    
+    data.return <- data.grouped %>% 
+      select(-std.error, -statistic, -p.value) %>% 
+      rename(observer = SUBJECT) %>%
+      spread(term, estimate) %>% mutate(d0 = 4.5,b=1.8) %>%
+
+      get_threshold(.)
+  }
+
+  return(boot.samples)
+}

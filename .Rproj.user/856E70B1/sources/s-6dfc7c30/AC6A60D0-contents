@@ -1,0 +1,27 @@
+#' Optimize scalar on ideal
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_optim_scale <- function() {
+  library(dplyr)
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/model.psychometrics.unscaled.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
+  
+  dprime.threshold <- get_dprime_at_eccentricity(model.psychometrics.unscaled, human.psychometrics)
+  
+  dprime.threshold.1 <- dprime.threshold %>% 
+    mutate(dprime_delta = dprime_at_threshold - 1, dprime_delta_z = dprime_delta / sd(dprime_delta)) %>% 
+    filter(dprime_delta_z < 3) %>%
+    select(-dprime_delta, dprime_delta_z)
+  
+  optim.scale <- optim(.5, function(x) sqrt(sum((x * dprime.threshold.1$dprime_at_threshold - 1)^2)), method = "Brent", lower = 0, upper = 1)
+  
+  optim.val <- optim.scale$par
+  
+  valid.conditions <- dprime.threshold.1 %>% select(TARGET, BIN, observer, sub_type) %>% unique()
+  list(optim.val = optim.val, valid.conditions = valid.conditions)
+}
+
+

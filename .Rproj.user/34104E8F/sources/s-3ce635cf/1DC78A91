@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1527883157116.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3934279505",
+    "id" : "1DC78A91",
+    "lastKnownWriteTime" : 1527866211,
+    "last_content_update" : 1527866211,
+    "path" : "/mnt/home/calen/Dropbox/Calen/Work/occluding/detection_model_analysis/_scene_statistics/predict_surround/extract_surround_stats.m",
+    "project_path" : "_scene_statistics/predict_surround/extract_surround_stats.m",
+    "properties" : {
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "matlab"
+}

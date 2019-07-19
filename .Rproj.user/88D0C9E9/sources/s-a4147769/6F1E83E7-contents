@@ -1,0 +1,75 @@
+#' Title
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_human_psychometrics <- function() {
+  library(bbmle)
+  library(broom)
+  
+  source(
+    '~/Dropbox/Calen/Work/occluding/detection_model_analysis/_human/export_responses.R'
+  )
+  
+  raw.data <- export.responses()
+  
+  data.grouped <- raw.data %>%
+    rename(e = ECCENTRICITY) %>%
+    group_by(SUBJECT, BIN) %>%
+    filter(TRIAL != 1) %>%
+    nest()
+  
+  pnorm_ <- function(x, log.p = T) {
+    pnorm(x,
+          mean = 0,
+          sd = 1,
+          log.p = log.p)
+  }
+  
+  
+  models <- map(data.grouped$data, function(data) {
+    output <-
+      mle2(
+        1 / 2 * (-1 + (HIT |
+                         CORRECTREJECTION) * 2) * 4.5 * e0 ^ b / (e0 ^ b + e ^ b) ~ pnorm_(),
+        parameters = list(e0 ~ 0 + TARGET),
+        start = list(e0 = 3, b = 1),
+        optimizer = "nlminb",
+        lower = c(0),
+        data = data
+      )
+  })
+  
+  data.grouped$models <- models
+  data.grouped$coef   <- map(data.grouped$models, tidy)
+  data.grouped        <- data.grouped %>% unnest(coef)
+  
+  bs  <- data.grouped %>% filter(term == "b")
+  e0s <- data.grouped %>% filter(term != "b")
+  
+  e0s <-
+    e0s %>% separate(term,
+                     into = c("parameter", "TARGET"),
+                     sep = ".TARGET") %>% select(-std.error, -statistic, -p.value)
+  bs  <-
+    bs %>% rename(parameter = term) %>% select(-statistic, -std.error, -p.value)
+  
+  bs  <- left_join(bs,
+                             e0s %>%
+                               select(-estimate,-parameter),
+                             by = c("SUBJECT", "BIN")) %>%
+    arrange(SUBJECT, BIN, TARGET)
+  
+  
+  params.joined <- rbind(e0s, bs) %>%
+    mutate(parameter = factor(parameter), TARGET = factor(TARGET)) %>%
+    spread(parameter, estimate) %>%
+    mutate(d0 = 4.5, gamma = 0)
+  
+  human.detect <- get_human_detect(raw.data) %>% as_tibble() %>% group_by(BIN, TARGET, SUBJECT) %>% nest()
+  
+
+  data.return <- left_join(params.joined, human.detect, by = c("BIN", "SUBJECT", "TARGET")) %>%
+    mutate(TARGET = factor(TARGET, levels = c("vertical", "horizontal", "bowtie", "spot")))
+}

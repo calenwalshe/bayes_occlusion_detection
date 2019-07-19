@@ -1,0 +1,153 @@
+#' A dataframe with dprime at human eccentricity threshold
+#'
+#' @param psychometric 
+#' @param eccentricity 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_dprime_at_eccentricity <- function(model.psychometrics, human.psychometrics) {
+  human.thresholds.strip <- human.psychometrics %>% select(BIN, TARGET, threshold)
+  
+  threshold.frame <- left_join(model.psychometrics, human.thresholds.strip, by = c("TARGET", "BIN"))
+  
+  dprime.at.threshold <- threshold.frame %>% group_by(TARGET, BIN, observer) %>%
+    nest() %>%
+    mutate(dprime_at_threshold = map(data, function(x) {
+      d0 <- x$d0
+      e0 <- x$e0
+      b <- x$b
+      
+      threshold <- x$threshold
+      
+      dprime.at.threshold <- d0 * e0^b / (e0^b + threshold^b)
+      
+    })) %>% 
+    unnest(dprime_at_threshold)
+  
+  model.psychometrics <- model.psychometrics %>% left_join(., dprime.at.threshold, by = c("TARGET", "BIN", "observer"))
+}
+
+
+#' Compute a psychometric model for the occlusion detection algorithm.
+#'
+#' @param model.dprime 
+#' @param scale.factor 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_model_psychometric <- function(model.dprime, scale.factor = 1) {
+  
+  library(curry)
+  summarize <- dplyr::summarise
+  
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/export_responses.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/human_psychometrics_tools.R')
+  model.dprime$dprime <- model.dprime$dprime * scale.factor
+  
+  # Maximum Likelihood Function
+  f.mle <- function(d0, e0, b, gamma, data) {
+    eccentricity          <- data$eccentricity
+    dprime_obs            <- data$dprime
+    
+    dprime_hat <- d0 * e0^b/(e0^b + eccentricity^b)
+    
+    error <- sqrt(sum((dprime_obs - dprime_hat)^2))
+    
+    if(is.nan(error)){
+      error <- 1000
+    }
+    return(error)
+  }
+  
+  data.grouped <- model.dprime %>%
+    rename(eccentricity = eccentricity) %>%
+    group_by(TARGET, observer, BIN) %>%
+    nest()
+
+  data.grouped$data <- map(data.grouped$data, function(x) x %>% group_by(eccentricity) %>% summarize(pc = pnorm(dprime/2), dprime = dprime))
+  
+  f.partial <- map(data.grouped$data, function(x) {
+    f.curry <- curry::partial(f.mle, list(data = x))
+  })  
+  
+  data.grouped$f.partial <- f.partial
+  
+  #### All parameters free to vary ####
+  all.free <- lapply(data.grouped$f.partial, FUN= function(x) {
+    deoptim.mle <- function(params) {
+      e0 <- params[1]
+      b <- params[2]
+      gamma <- params[3]
+      d0 <- params[4]
+      
+      result <- x(e0 = e0, b = b, gamma = gamma, d0 = d0)
+    }
+    
+    DEoptim(deoptim.mle, lower = c(e0 = 0, b = 0, gamma = 0, d0 = 0), upper = c(e0 = 50, b = 100, gamma = 0, d0 = 275), DEoptim.control(trace = 200))
+  })
+  
+  all.free.params <- map(all.free, c(1,1))
+  
+  #### Find best fit for a grouped d0 ####
+  # Contains parameters for fitting.
+  param.frame <- data.grouped[, 1:5]
+  param.frame$params <- all.free.params
+  
+  param.frame$params <- map(param.frame$params, function(x) {
+    data.frame(as.list(x))
+  })
+  
+  param.frame <- param.frame %>% unnest(params)
+  
+  # #plot.model.psychometric(param.frame)
+  # 
+  # #### END ####
+  # 
+  #   #### Find best fit for a grouped b fixed d0 ####
+  # # Contains parameters for fitting.
+  # param.frame.2 <- param.frame %>% 
+  #   group_by(BIN) %>%
+  #   mutate(b = mean(b))
+  # 
+  # # Fit the function
+  # level.2.params.frame <- by_row(param.frame.2, function(row) {
+  #   x <- row$f.partial[[1]]
+  #   
+  #   deoptim.mle <- function(params) {
+  #     e0 <- params[1]
+  #     b <- params[2]
+  #     gamma <- params[3]
+  #     d0 <- params[4]
+  #     
+  #     x(e0 = e0, b = b, gamma = gamma, d0 = d0)
+  #   }
+  #   
+  #   d0.fixed <- row$d0[[1]]
+  #   b.fixed  <- row$b[[1]]
+  #   
+  #   optim.eval <- DEoptim(deoptim.mle, lower = c(e0 = 0, b = b.fixed, gamma = 0, d0 = d0.fixed), upper = c(e0 = 50, b = b.fixed, gamma = 0, d0 = d0.fixed))
+  # }, .to = "params")
+  # 
+  # level.2.params <- map(level.2.params.frame$params, c(1,1))
+  # 
+  # param.frame.2 <- data.grouped[, 1:5]
+  # 
+  # param.frame.2$params <- level.2.params
+  # 
+  # param.frame.2$params <- map(param.frame.2$params, function(x) {
+  #   data.frame(as.list(x))
+  # })
+  # 
+  # param.frame.2 <- param.frame.2 %>% unnest(params)
+  
+  #plot.model.psychometric(param.frame.2 %>% mutate(sub_type = "model", observer = "model"))
+  
+  final.params <- param.frame # make sure this sends the correct parameters
+  
+  return(final.params)
+}
+

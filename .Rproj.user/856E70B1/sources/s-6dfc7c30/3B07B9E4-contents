@@ -1,0 +1,116 @@
+source("~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R")
+source("~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometrics.R")
+
+
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error.rdata")
+
+model.responses <- model.error %>% group_by(TARGET, BIN, observer) %>% nest(eccentricity, dprime)
+
+by_row(model.responses, function(x) {
+  browser()
+  dat <- data.frame(TARGET = x$TARGET, BIN = x$BIN, observer = x$observer, eccentricity = x$data[[1]]$eccentricity, dprime = x$data[[1]]$dprime)
+  
+  f.optim <- function(scale) {
+    psy.tmp <- get_model_psychometric(dat, .1)
+    dprime.at.t <- get_dprime_at_eccentricity(psy.tmp, human.psychometrics)    
+    
+    if(min(psy.tmp$data[[1]]) > 1) {
+      optim.val <- NA
+    } else {
+      optim.val <- sum((dprime.at.t$dprime_at_threshold - 1)^2)
+    }
+  }
+  optim(.1, f.optim, method = "Brent", lower = 0, upper = 1)
+})
+
+get_model_psychometric(model.responses$data[[1]],1)
+
+optimal.all.1 <- optimal.all %>% filter(sub_type == "optimal") %>% select(-SUBJECT)
+
+efficiency <- get_dprime_at_eccentricity(model.psychometrics.unscaled, human.psychometrics)
+
+plot_efficiency(efficiency)
+
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(grid)
+  
+  summarize <- dplyr::summarise
+  
+  load('~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/human.psychometrics.rdata')
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometric.unscaled.rdata")
+  
+  model.psychometrics.efficiency         <- get_dprime_at_eccentricity(model.psychometric.unscaled, human.psychometrics)
+  
+  bin.values <- get_experiment_bin_values()
+  
+  efficiency.df <- left_join(model.psychometrics.efficiency, bin.values, by = c("TARGET", "BIN"))
+  
+  if(plotType == 1) { # cardinal axis
+    efficiency.df.1 <- efficiency.df %>% 
+      mutate(efficiency = 1 / dprime_at_threshold) %>% 
+      group_by(TARGET, BIN, observer, statType, statValue) %>% 
+      summarize(efficiency = mean(efficiency))
+    
+    efficiency.df.1$observer <- factor(efficiency.df.1$observer, levels = c("optimal", "nocov", "mahalanobis"), labels = c("Optimal", "No Covariance", "Mahalanobis"))    
+    # Efficiency by statistic    
+    fig <- efficiency.df.1 %>%
+      group_by(statType) %>%
+      nest() %>%
+      mutate(fig = map2(statType, data, function(statType, data) {
+        efficiency.df <- data
+        
+        x.lab <- ifelse(statType == "Lvals", "Luminance (%)", ifelse(statType == "Cvals", "Contrast (RMS)", "Similarity"))
+        
+        x.range <- ifelse(statType == "Lvals", c(0,60), ifelse(statType == "Cvals", c(0,.8), c(.3,.9)))
+        
+        #efficiency.df$observer <- factor(efficiency.df$observer, levels = c("mahalanobis", "nocov", "optimal"), labels = c("Mahalanobis", "No Covariance", "Optimal"))
+        
+        fig.1 <- ggplot(efficiency.df, aes(x = statValue, y = efficiency, colour = TARGET)) +
+          geom_point(size = 4) +
+          geom_line(size = 2) +
+          facet_grid(~observer) +
+          theme_set(theme_minimal(base_size = 30))  +# pre-set the bw theme.
+          theme.1 +
+          theme(aspect.ratio = 1, 
+                axis.title.y = element_text(angle = 0, vjust = .5)) +
+          expand_limits(x = x.range, y = c(.1, .3)) +
+          scale_color_manual(values = colours.targets) +
+          xlab(x.lab) +
+          ylab(expression(sqrt(eta)))
+        
+        plot(fig.1)
+        ggsave(file = paste0("~/Dropbox/Calen/Work/occluding/paper/figures/efficiency/efficiency_", statType, '_', first(data$model), ".pdf"), width = 15, height = 5, useDingbats = FALSE)
+      }))
+    
+  } else if(plotType == 2) {
+    
+    efficiency.df.2 <- efficiency.df %>% 
+      mutate(efficiency = 1 / dprime_at_threshold) %>% 
+      group_by(TARGET, BIN, observer, statType, statValue) %>% 
+      summarize(efficiency = mean(efficiency))
+    
+    efficiency.df.2$observer <- factor(efficiency.df.2$observer, levels = c("optimal", "nocov", "mahalanobis"), labels = c("Optimal", "No Covariance", "Mahalanobis"))          
+    
+    efficiency.by.ecc <- efficiency.df %>% group_by(TARGET, eccentricity) %>% summarize(eff.avg = mean(efficiency))
+    
+    # Efficiency by statistic    
+    fig.1 <- ggplot(efficiency.by.ecc, aes(x = eccentricity, y = eff.avg, colour = TARGET)) +
+      geom_point(size = 2) +
+      geom_line(size = 1.25) +
+      facet_grid(~observer) +
+      theme_set(theme_minimal(base_size = 30))  +# pre-set the bw theme.
+      theme.1 +
+      theme(aspect.ratio = 1, 
+            axis.title.y = element_text(angle = 0, vjust = .5)) +
+      expand_limits(x = c(0), y = c(0, .3)) +
+      scale_color_manual(values = colours.targets) +
+      xlab(x.lab) +
+      ylab(expression(sqrt(eta)))
+    
+    plot(fig.1)  
+    ggsave(file = "~/Dropbox/Calen/Dropbox/efficiency_eccentricity.pdf", width = 25, height = 25)
+  }
+}

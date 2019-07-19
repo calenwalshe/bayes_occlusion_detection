@@ -1,0 +1,87 @@
+#' Compute eccentricity psychometric functions for the model responses
+#'
+#' @param model.dprime 
+#' @param scale.dprime 
+get_model_psychometric <- function(model.dprime, scale.dprime = 1) {
+  library(bbmle)
+  library(dplyr)
+  library(purrr)
+  library(Hmisc)
+  library(DEoptim)
+  
+  model.dprime.nest <- model.dprime %>% 
+    mutate(dprime = dprime * scale.dprime) %>%
+    group_by(TARGET, BIN, observer, sub_type) %>% 
+    nest()
+  
+  dprime.models <- map(model.dprime.nest$data, function(data) {
+    
+    e0_start <- approxExtrap(data$dprime, data$eccentricity, 0)$y / 2
+    
+    max_dprime <- max(data$dprime)
+    
+    f <- function(x) {
+      e0 <- x[1]
+      b  <- x[2]
+      d0 <- x[3]
+      
+      dprime_obs <- data$dprime
+      eccentricity <- data$eccentricity
+      
+      dprime_hat <- d0 * e0^b/(e0^b + eccentricity^b)
+      
+      sqrt(sum((dprime_obs - dprime_hat)^2))
+    }
+    
+    fit <- DEoptim(f, lower = c(e0 = 0, b = 0, d0 = (max(data$dprime) - min(data$dprime))/2), upper = c(e0 = 100, b = 10, d0 = 250), control = list(trace = 0))
+    
+    
+    #fit <- mle2(dprime ~ dnorm(mean = 1/2 * d0 * e0^b/(e0^b + eccentricity^b), sd = 1), 
+    #     start = list(e0 = 10, b = 3, d0 = max_dprime), fixed = list(d0 = max_dprime),
+    #     data = data[,c("eccentricity", "dprime")] %>% data.frame())
+    
+    
+    coef.fit <- data.frame(as.list(fit$optim$bestmem))
+  })
+
+  model.dprime.nest$models <- dprime.models
+  
+  model.dprime.nest$BIN <- factor(model.dprime.nest$BIN)
+  model.dprime.nest$TARGET <- factor(model.dprime.nest$TARGET)
+  
+  model.return <- model.dprime.nest %>% 
+    unnest(models)
+}
+
+#' A dataframe with dprime at human eccentricity threshold
+#'
+#' @param psychometric 
+#' @param eccentricity 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_dprime_at_eccentricity <- function(model.psychometrics, human.psychometrics) {
+  
+  human.thresholds.strip <- human.psychometrics %>% select(BIN, observer, TARGET, threshold) %>% rename(SUBJECT = observer)
+  
+  threshold.frame <- left_join(model.psychometrics, human.thresholds.strip, by = c("TARGET", "BIN"))
+  
+  dprime.at.threshold <- threshold.frame %>% group_by(TARGET, BIN, observer, sub_type, SUBJECT) %>%
+    nest() %>%
+    mutate(dprime_at_threshold = map(data, function(x) {
+      d0 <- x$d0
+      e0 <- x$e0
+      b <- x$b
+      
+      threshold <- x$threshold
+      
+      dprime.at.threshold <- d0 * e0^b / (e0^b + threshold^b)
+      
+    })) %>% 
+    unnest(dprime_at_threshold) %>%
+    select(-data)
+  
+  model.psychometrics <- model.psychometrics %>% left_join(., dprime.at.threshold, by = c("TARGET", "BIN", "observer", "sub_type"))
+}

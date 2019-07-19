@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1532624459661.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "B725ADBE",
+    "lastKnownWriteTime" : 1532548354,
+    "last_content_update" : 1532548354,
+    "path" : "~/Dropbox/Calen/Work/occluding/detection_model_analysis/notebooks/low_luminance/low_luminance.Rmd",
+    "project_path" : "notebooks/low_luminance/low_luminance.Rmd",
+    "properties" : {
+        "chunk_output_type" : "inline",
+        "cursorPosition" : "34,2",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

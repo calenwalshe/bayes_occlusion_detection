@@ -3,8 +3,8 @@ source("~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometri
 
 
 load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
-load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_error.rdata")
-load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error2d.rdata")
+#load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
 
 model.all <- model.error %>% mutate(pc = pnorm(dprime/2)) %>% select(BIN, TARGET, observer, SUBJECT, eccentricity,dprime) %>% filter(SUBJECT %in% c("optimal", "nocov"))
 bin.values <- get_experiment_bin_values()
@@ -56,30 +56,34 @@ save(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_respon
 
 
 ## Alternative Method
+summarize <- dplyr::summarise
 source("~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R")
 source("~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometrics.R")
 
 
 load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
-load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_error.rdata")
-load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error2d.rdata")
+#load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
 
-model.all <- model.error %>% mutate(pc = pnorm(dprime/2)) %>% select(BIN, TARGET, observer, SUBJECT, eccentricity,dprime)
+model.all <- model.error %>% mutate(pc = pnorm(dprime/2)) %>% 
+  select(BIN, TARGET, observer, SUBJECT, eccentricity,dprime)
 bin.values <- get_experiment_bin_values()
 
 
 model.all$observer <- model.all$SUBJECT
 model.all$SUBJECT <- NULL
 
-model.mahal <- model.mahal %>% select(BIN, TARGET, observer, eccentricity,dprime)
+#model.mahal <- model.mahal %>% select(BIN, TARGET, observer, eccentricity,dprime)
 
-model.all <- rbind(model.all, model.mahal)
+#model.all <- rbind(model.all, model.mahal)
 
-model.responses <- model.all %>% group_by(TARGET, BIN, observer) %>% nest(eccentricity, dprime) %>% as_tibble()
+model.responses <- model.all %>% 
+  group_by(TARGET, BIN, observer) %>% 
+  nest(eccentricity, dprime) %>% as_tibble()
 
 human.psychometrics.ave <- human.psychometrics %>% group_by(TARGET, BIN) %>% summarize(threshold = mean(threshold)) %>% mutate(observer = "ave")
 model.psy.tmp <- get_model_psychometric(model.all, 1)
-dprime.at.t <- get_dprime_at_eccentricity(model.psy.tmp, human.psychometrics.ave) %>% select(-data.x, -data.y) %>% mutate(efficiency = 1/dprime_at_threshold)
+dprime.at.t <- get_dprime_at_eccentricity_interpolation(model.error, human.psychometrics.ave) %>% select(-subject_name) %>% mutate(efficiency = 1/dprime_at_threshold)
 
 model.efficiency <- dprime.at.t
 save(file = "~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/efficiency.rdata", model.efficiency)

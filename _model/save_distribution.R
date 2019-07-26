@@ -30,25 +30,21 @@ save_gaussian_distributions <- function(template_response) {
       spread(function_name, TRESP) %>%
       summarize(
         edge_mean = mean(edge_cos),
-        lum_mean = mean(mean_only),
         pattern_mean = mean(pattern_only),
         edge_sd = sd(edge_cos),
-        lum_sd = sd(mean_only),
         pattern_sd = sd(pattern_only),
-        edge_lum_cor = cor(edge_cos, mean_only),
         edge_pattern_cor = cor(edge_cos, pattern_only),
-        lum_pattern_cor = cor(mean_only, pattern_only),
         cor_mat = list(cor(as.matrix(
-          data.frame(edge_cos, mean_only, pattern_only)
+          data.frame(edge_cos, pattern_only)
         ))),
         cov_mat = list(cov(as.matrix(
-          data.frame(edge_cos, mean_only, pattern_only)
+          data.frame(edge_cos, pattern_only)
         ))),
         inv_cov_mat = list(solve(cov_mat[[1]]))
       ) %>%
       rowwise() %>%
       mutate(
-        mean_vec = list(c(edge_mean, lum_mean, pattern_mean)),
+        mean_vec = list(c(edge_mean, pattern_mean)),
         sd_vec   = list(sqrt(diag(cov_mat))),
         var_vec  = list(diag(cov_mat)),
         cor_vec  = list(cor_mat[upper.tri(cor_mat)]),
@@ -95,7 +91,6 @@ save_gaussian_distributions <- function(template_response) {
                 response_vec = list(as.matrix(
                   data.frame(
                     edge = edge_cos,
-                    mean = mean_only,
                     pattern = pattern_only
                   )
                 ))) %>%

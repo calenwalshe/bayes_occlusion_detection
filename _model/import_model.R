@@ -22,7 +22,7 @@ get_template_response <- function(file_path) {
     template_response <- merge(template_response, bin_values)
     
     pyramidLvl <- data.frame(PYRAMIDLVL = c(1, 2, 3, 4, 5), 
-        eccentricity = c(0, 1.67, 5.01, 11.69, 25.05), 
+        eccentricity = round(c(0.000000,1.261062,4.172228,12.255842,54.468623),2), 
         downsampleR = c(1, 2, 4, 8, 16))
     
     template_response <- merge(template_response, pyramidLvl) %>% 
@@ -47,17 +47,16 @@ get_template_response <- function(file_path) {
     template_response$BIN <- as.factor(template_response$BIN)
     
     # Import multiple response function types.
-    template_response <- template_response %>% 
-      mutate(function_name = ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.edgeResponseMag" & NUM_RESPONSE == 1, "edge_cos", 
-        ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.edgeResponseMag" & NUM_RESPONSE == 2, "edge_mag", 
-        ifelse(RESPONSEFUNC_NAME == "occluding_model.lib.response_functions.separableTR" & NUM_RESPONSE == 1, "mean_only", 
-               "pattern_only")))) %>%
-  select(-RESPONSEFUNC, -NUM_RESPONSE, -RESPONSEFUNC_NAME)
+    template_response$RESPONSEFUNC_NAME <- str_extract(template_response$RESPONSEFUNC_NAME, "edge|TR")
     
-    template_response <- template_response %>% filter(function_name %in% 
-        c("pattern_only", "mean_only", "edge_cos")) %>% arrange(TARGET, 
+    template_response <- template_response %>% 
+      rename(function_name = RESPONSEFUNC_NAME) %>%
+      arrange(TARGET, 
         BIN, statType, eccentricity) %>%
       as_tibble()
+    
+    template_response$function_name[template_response$function_name == "edge"] <- "edge_cos"
+    template_response$function_name[template_response$function_name == "TR"] <- "pattern_only"
     
     return(template_response)
 }
@@ -130,41 +129,50 @@ get_bin_values <- function() {
 #' Get receptive field spacing based on Drasdo (2007).
 get_eccentricity <- function(model_space, direction = "temporal") {
   library(Hmisc)
-  #pyramid_space    <- 1/(120/(2^seq(0,5,1)))
+  pyramid_space    <- 1/(120/(2^seq(0,4,1)))
   degrees          <- c(0, .25, .5, 1, 2, 5, 10, 20, 25, 30)
   gc_count         <- c(27930, 19438, 14614, 9365, 4986, 1633, 578, 231, 214, 182)
   spacing          <- 1/sqrt(gc_count/2)
   spacing[1]          <- 1/120
   
-  yy <- log(1/sqrt(gc_count/2))
+  # michaelis menten
   
   f <- function(xx) {
+    s_max <- xx[1]
+    a     <- xx[2]
+    b     <- 1/120
+    
     pred.f <- function(degrees) {
-      xx[3] - xx[1] * (exp(-xx[2]*degrees))
+      r.val <- s_max * degrees / (a + degrees) + b
     }
     
-    sqrt(sum((yy - pred.f(degrees))^2))
+    sqrt(sum((spacing - pred.f(degrees))^2))
   }
   
-    f.1 <- function(x.1, x.2, x.3) {
-    return.val <- x.3 - x.1 * (exp(-x.2*degrees))
-    }
+  f.1 <- function(s_max, a, b = 1/120, x) {
+    r.val <- s_max * x / (a + x) + b
+  }
   
-  start.val <- c(2, 2, -2.5)
+  start.val <- c(1,1)
   params <- optim(start.val, f)
   
   x.1 <- params$par[1]
   x.2 <- params$par[2]
-  x.3 <- params$par[3]
+  #x.3 <- params$par[3]
   
-  output <- f.1(x.1, x.2, x.3)
+  output <- f.1(s_max = x.1, a = x.2, x = seq(0, 60, .01))
   
-  my.dat <- data.frame(degrees = degrees, data = yy, prediction = output)
+  my.dat <- data.frame(degrees = degrees, data = spacing) %>% mutate(type = "obs")
+  my.dat.1 <- data.frame(degrees = seq(0, 60, .01), data = output) %>% mutate(type = "pred")
   
-  my.dat.1 <- my.dat %>% gather("type", "value",  2:3)
+  ggplot(my.dat, aes(x = degrees, y = data, colour = type)) + geom_point() + geom_line(data = my.dat.1, aes(x = degrees, y = data), inherit.aes = TRUE) + coord_cartesian(ylim = c(0, .14)) + geom_hline(yintercept = 1/c(120 / 2^c(0, 1, 2, 3, 4)))
   
-  ggplot(my.dat.1, aes(x = degrees, y = exp(value), colour = type)) + geom_point()
+  s_max <- x.1
+  a <- x.2
+  b <- 1/120
   
-  eccentricity.bradley <- (pyramid_space - spacing[1]) / spacing[1] * 1.67 # Bradley Geisler 2014
-  return(eccentricity)
+  c <- (pyramid_space - 1/120)/s_max
+  deg.interp <- c*a / (1 - c)
+
+  return(deg.interp)
 }

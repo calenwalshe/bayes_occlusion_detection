@@ -92,6 +92,35 @@ get_threshold <- function(psychometric_parameters) {
   return(thresholds)
 }
 
+#' Compute eccentricity threshold from linearly interpolated model responses
+#'
+#' @param psychometric 
+#' @param eccentricity 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_interpolated_threshold <- function(model.psychometric, human.psychometrics) {
+  library(tidyr)
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/human_psychometrics_tools.R')
+  
+  #model.error.1 <- model.psychometric %>%
+  #  mutate(dprime = dprime * scale) %>%
+  #  #select(BIN, TARGET, eccentricity, observer, dprime) %>%
+  #  group_by(BIN, TARGET, observer) %>% 
+  #  filter(observer == "optimal") %>%
+  #  nest() 
+  
+  model.psychometric$threshold <- map(model.psychometric$data, function(x) {
+    ln.mod <- approxExtrap(x$dprime, x$eccentricity, 1)$y
+  }) %>% unlist()
+  
+  model.psychometric <- model.psychometric %>% select(-data)
+  
+  return(model.psychometric)
+}
+
 #' Add thresholds to a dataframe that contains psychometric parameters
 get_threshold_extrap <- function(psychometric_parameters) {
   approxExtrap <- Hmisc::approxExtrap

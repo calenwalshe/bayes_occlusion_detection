@@ -23,7 +23,8 @@ plot_eccentricity_thresholds <- function() {
   
   model.psychometrics.scaled <- model.psychometrics.scaled %>% filter(observer %in% c("optimal"))
   
-  model.thresholds  <- get_threshold_extrap(model.psychometrics.scaled)
+  #model.thresholds  <- get_threshold_extrap(model.psychometrics.scaled)
+  model.thresholds <- get_interpolated_threshold(model.psychometrics.scaled)
   human.thresholds  <- get_threshold(human.psychometrics)
   
   human.thresholds <- human.thresholds %>% ungroup() %>%

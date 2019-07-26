@@ -29,6 +29,33 @@ get_dprime_at_eccentricity <- function(model.psychometrics, human.psychometrics)
   model.psychometrics <- model.psychometrics %>% left_join(., dprime.at.threshold, by = c("TARGET", "BIN", "observer"))
 }
 
+#' Dprime at threshold linear interpolation method.
+#'
+#' @param psychometric 
+#' @param eccentricity 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_dprime_at_eccentricity_interpolation <- function(model.error, human.psychometrics) {
+  model.error.1 <- model.error %>%
+    select(BIN, TARGET, eccentricity, observer, dprime) %>%
+    group_by(BIN, TARGET, observer) %>% 
+    filter(observer == "optimal") %>%
+    nest() 
+  
+  human.psychometrics.strip <- human.psychometrics %>% select(BIN, TARGET, observer, threshold) %>% rename(subject_name = observer)
+  
+  model.error.2 <- left_join(human.psychometrics.strip, model.error.1, by = c("BIN", "TARGET"))
+  
+  model.error.2$dprime_at_threshold <- map2(model.error.2$threshold, model.error.2$data, function(x,y) {
+    dprime_at_threshold <- approxExtrap(y$eccentricity, y$dprime, x)$y
+  }) %>% unlist()
+  
+  model.error.2 <- model.error.2 %>% select(-data)
+}
+
 
 #' Compute a psychometric model for the occlusion detection algorithm.
 #'
@@ -173,4 +200,3 @@ get_model_psychometric <- function(model.dprime, scale.factor = 1) {
   
   return(final.params)
 }
-

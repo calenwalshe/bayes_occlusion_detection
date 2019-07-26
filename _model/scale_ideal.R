@@ -88,13 +88,15 @@ get_optim_scale <- function() {
 get_optim_scale.1 <- function() {
   library(dplyr)
   library(DEoptim)
+  
+  summarize <- dplyr::summarise
   source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_psychometrics.R')
   source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
   
   #load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.psychometric.rdata")
   load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/human.psychometrics.rdata")
-  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_error.rdata")
-  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error2d.rdata")
+  #load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.mahal.rdata")
   load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/efficiency.rdata")
   
   human.psychometrics.ave <- human.psychometrics %>% group_by(TARGET, BIN) %>% summarize(threshold = mean(threshold)) %>% mutate(observer = "ave")  
@@ -105,13 +107,18 @@ get_optim_scale.1 <- function() {
   model.all$SUBJECT <- NULL
   
   
-  model.mahal <- model.mahal %>% select(BIN, TARGET, observer, eccentricity, dprime)
+  #model.mahal <- model.mahal %>% select(BIN, TARGET, observer, eccentricity, dprime)
   
-  model.all <- rbind(model.all, model.mahal)  
+  #model.all <- rbind(model.all, model.mahal)  
   
-  model.efficiency.ave <- model.efficiency %>% group_by(observer) %>% mutate(scale.val = scale(efficiency)) %>% filter(abs(scale.val) < 3) %>% summarize(efficiency = mean(efficiency))
+  model.efficiency.ave <- model.efficiency %>% 
+    group_by(observer) %>% 
+    mutate(scale.val = scale(efficiency)) %>% filter(abs(scale.val) < 3) %>% 
+    summarize(efficiency = mean(efficiency))
   
-  model.scale.vals <- merge(model.all, model.efficiency.ave) %>% as_tibble() %>% mutate(dprime = dprime * efficiency)
+  model.scale.vals <- merge(model.all, model.efficiency.ave) %>% 
+    as_tibble() %>% 
+    mutate(dprime = dprime * efficiency)
   
   model.psychometric.optim <- get_model_psychometric(model.scale.vals, 1)
 

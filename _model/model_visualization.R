@@ -108,16 +108,16 @@ plot.quick.thresholds <- function(model.psychometrics) {
 plot.quick.dprime <- function(model.error) {
   source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
   #load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/old_model_error/model.error.rdata")
-  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_error.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error2d.rdata")
   bin.values <- get_experiment_bin_values()
   mod.marg <- by_row(model.error, function(x) {
     themeans <- abs(x$data_mean_vec_1[[1]] - x$data_mean_vec_0[[1]])
-    names(themeans) <- c("edge", "mean", "pattern")
+    names(themeans) <- c("edge", "pattern")
     thesigma <- sqrt(x$data_sd_vec_0[[1]]^2)
     
     thedprime <- themeans / thesigma
     
-    data.frame(edge = thedprime[1], mean = thedprime[2], pattern = thedprime[3])
+    data.frame(edge = thedprime[1], pattern = thedprime[2])
   }, .to = "output") %>% select(BIN, TARGET, eccentricity, output)
   
   mod.marg.1 <- mod.marg %>% unnest(output)
@@ -129,7 +129,7 @@ plot.quick.dprime <- function(model.error) {
   model.error.1 <- merge(model.error, bin.values) %>% filter(observer == "optimal") %>% as_tibble() %>% filter(statType == "Cvals")
   
   theme_set(theme_bw())
-  fig.1 <- ggplot(mod.marg.3, aes(x = statValue, y = sqrt(pattern^2 + mean^2 + edge^2), colour = as.factor(eccentricity))) + geom_point() + geom_line() + facet_grid(~TARGET) + theme(aspect.ratio = 1) + xlab("Luminance") + ylab("dprime")
+  fig.1 <- ggplot(mod.marg.3, aes(x = statValue, y = sqrt(pattern^2 + edge^2), colour = as.factor(eccentricity))) + geom_point() + geom_line() + facet_grid(~TARGET) + theme(aspect.ratio = 1) + xlab("Luminance") + ylab("dprime")
   
   fig.2 <- ggplot(mod.marg.3, aes(x = statValue, y = edge, colour = as.factor(eccentricity))) + geom_point() + geom_line() + facet_grid(~TARGET) + theme(aspect.ratio = 1) + xlab("Luminance") + ylab("dprime")
   

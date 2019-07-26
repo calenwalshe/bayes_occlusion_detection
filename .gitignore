@@ -1,4 +1,7 @@
 *.html
+_paper1figures
+_notesbooks
+_data_analysis
 notebooks
 *.txt
 *.csv

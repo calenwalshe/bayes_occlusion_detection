@@ -11,7 +11,7 @@ plot.summary.statistics.cardinal <- function() {
   
   source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/plot_theme.R')
   source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
-  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model_error.rdata")
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error2d.rdata")
   
   bin.values <- get_experiment_bin_values()
   
@@ -19,24 +19,24 @@ plot.summary.statistics.cardinal <- function() {
     select(TARGET, BIN, eccentricity,data_sd_vec_0, data_sd_vec_1, data_mean_vec_0, data_mean_vec_1)
   
   values.df$edge.sd.abs <- map(values.df$data_sd_vec_0, 1)
-  values.df$mean.sd.abs <- map(values.df$data_sd_vec_0, 2)
-  values.df$pattern.sd.abs <- map(values.df$data_sd_vec_0, 3)
+  #values.df$mean.sd.abs <- map(values.df$data_sd_vec_0, 2)
+  values.df$pattern.sd.abs <- map(values.df$data_sd_vec_0, 2)
   
   values.df$edge.mean.abs <- map(values.df$data_mean_vec_0, 1)
-  values.df$mean.mean.abs <- map(values.df$data_mean_vec_0, 2)
-  values.df$pattern.mean.abs <- map(values.df$data_mean_vec_0, 3)
+  #values.df$mean.mean.abs <- map(values.df$data_mean_vec_0, 2)
+  values.df$pattern.mean.abs <- map(values.df$data_mean_vec_0, 2)
   
   values.df$edge.sd.pres <- map(values.df$data_sd_vec_1, 1)
-  values.df$mean.sd.pres <- map(values.df$data_sd_vec_1, 2)
-  values.df$pattern.sd.pres <- map(values.df$data_sd_vec_1, 3)
+  #values.df$mean.sd.pres <- map(values.df$data_sd_vec_1, 2)
+  values.df$pattern.sd.pres <- map(values.df$data_sd_vec_1, 2)
   
   values.df$edge.mean.pres <- map(values.df$data_mean_vec_1, 1)
-  values.df$mean.mean.pres <- map(values.df$data_mean_vec_1, 2)
-  values.df$pattern.mean.pres <- map(values.df$data_mean_vec_1, 3)  
+  #values.df$mean.mean.pres <- map(values.df$data_mean_vec_1, 2)
+  values.df$pattern.mean.pres <- map(values.df$data_mean_vec_1, 2)  
   
   values.df <- values.df %>% select(-contains("data"))
   
-  values.df <- values.df %>% gather("name","value",4:15)
+  values.df <- values.df %>% gather("name","value",4:11)
   
   values.df <- values.df %>% separate(name, c("cue", "statistic", "bPresent"))
   
@@ -44,21 +44,21 @@ plot.summary.statistics.cardinal <- function() {
   
   values.df$value <- do.call(rbind, values.df$value)
   
-  values.df$cue <- factor(values.df$cue, levels = c("edge", "mean", "pattern"), labels = c("Edge", "Luminance", "Pattern"))
+  values.df$cue <- factor(values.df$cue, levels = c("edge", "pattern"), labels = c("Edge", "Pattern"))
   values.df$statType <- factor(values.df$statType, levels = c("Lvals", "Cvals", "Svals"), labels = c("Luminance", "Contrast", "Similarity"))
   values.df$statistic <- factor(values.df$statistic, levels = c("mean", "sd"), labels = c("Mean", "Standard Deviation"))
   
   values.df$statValue[values.df$statType == "Luminance"] <- values.df$statValue[values.df$statType == "Luminance"] / 100
   to_string <- as_labeller(c(`Luminance` = "Luminance (Rel)", `Contrast` = "Contrast (RMS)", `Similarity` = "Similarity", `Mean` = "Mean", `Standard Deviation` = "Standard Deviation"))
   
-  invis.dat.lum <- values.df %>% 
-    filter(cue == "Luminance") %>%
-    group_by(statistic) %>% 
-    #mutate(value = list(c(min(value), max(value)))) %>% 
-    mutate(min.val = min(value), max.val = max(value), add.range = (max.val - min.val) * .1) %>%
-    mutate(value = list(c(min(min.val - add.range), max(max.val + add.range)))) %>%
-    unique() %>% select(-min.val,max.val, add.range) %>%
-    unnest(value)
+  #invis.dat.lum <- values.df %>% 
+  #  filter(cue == "Luminance") %>%
+  #  group_by(statistic) %>% 
+  #  #mutate(value = list(c(min(value), max(value)))) %>% 
+  #  mutate(min.val = min(value), max.val = max(value), add.range = (max.val - min.val) * .1) %>%
+  #  mutate(value = list(c(min(min.val - add.range), max(max.val + add.range)))) %>%
+  #  unique() %>% select(-min.val,max.val, add.range) %>%
+  #  unnest(value)
   
   invis.dat.edge <- values.df %>% 
     filter(cue == "Edge") %>%
@@ -78,7 +78,7 @@ plot.summary.statistics.cardinal <- function() {
     unique() %>% select(-min.val,max.val, add.range) %>%
     unnest(value)
   
-
+  # BEGIN LAPPLY FOR STATISTICS
   lapply(c(0, 12), FUN = function(x) {
     
     palettes <- ggthemes_data[["tableau"]][["color-palettes"]][["regular"]]
@@ -96,7 +96,6 @@ plot.summary.statistics.cardinal <- function() {
     values.dprime <- merge(bin.values, values.dprime) %>% as_tibble() %>% mutate(statValue = ifelse(statType == "Lvals", statValue / 100, statValue))
     values.dprime$statType <- factor(values.dprime$statType, levels = c("Lvals", "Cvals", "Svals"), labels = c("Luminance", "Contrast", "Similarity"))
       
-    invis.lum  <- invis.dat.lum %>% mutate(bPresent = ifelse(bPresent == "abs", "Absent", "Present")) %>% filter(round(eccentricity) == x)
     invis.edge <- invis.dat.edge %>% mutate(bPresent = ifelse(bPresent == "abs", "Absent", "Present")) %>% filter(round(eccentricity) == x)
     invis.pat <- invis.dat.pat %>% mutate(bPresent = ifelse(bPresent == "abs", "Absent", "Present")) %>% filter(round(eccentricity) == x)
     
@@ -135,49 +134,52 @@ plot.summary.statistics.cardinal <- function() {
                  strip.background  = element_blank(),
                  strip.text = element_text(size = panel.text.sz))
     
+    colour.guide <- guide_legend(label.theme = element_text(size = 10))
+    axis.val.dprime <- "free"
+    axis.val.stats  <- "free"
     # Luminance
     # Dprime 
-    breaks <- values.dprime %>% filter(cue == "Luminance") 
-    breaks <- (c(floor(min(breaks$dprime)), ceiling(max(breaks$dprime))))
-    breaks <- if((breaks[2] - breaks[1] <= 4)){
-      breaks <- seq(1,4)
-    } else{
-      breaks <- round(seq(breaks[1], breaks[2], length.out = 4))
-    }
+    #breaks <- values.dprime %>% filter(cue == "Luminance") 
+    #breaks <- (c(floor(min(breaks$dprime)), ceiling(max(breaks$dprime))))
+    #breaks <- if((breaks[2] - breaks[1] <= 4)){
+    #  breaks <- seq(1,4)
+    #} else{
+    #  breaks <- round(seq(breaks[1], breaks[2], length.out = 4))
+    #}
 
 
-    fig.dprime <- ggplot(values.dprime %>% filter(cue == "Luminance"), 
-                         aes(x = statValue, y = dprime, colour = TARGET)) + 
-      facet_grid(~statType, scale = "free_x", labeller = to_string, switch = "both") + 
-      geom_point(size = point.sz) +
-      #geom_point(data = invis.dprime, x = NA, size = 1) +
-      geom_line(size = .5) +
-      ggtitle(paste0("Intensity Cue", " ", x, "\U00B0")) +
-      scale_color_manual(values = colours.targets) +
-      scale_y_continuous(breaks = breaks) +
-      expand_limits(y = c(breaks[1], breaks[2])) +
-      guides(colour = "none", shape = "none", linetype = "none") +
-      xlab("") +
-      ylab("dprime")
-    
-    plot(fig.dprime)
-    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/',
-                             'dprime_luminance_', x, '.pdf'), plot = fig.dprime, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
-    
-    fig.lum <- ggplot(values.eccentricity %>% filter(cue == "Luminance"), aes(x = statValue, y = value, colour = TARGET, shape = bPresent, group =)) + 
-      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
-      geom_point(size = point.sz) +
-      geom_point(data = invis.lum, x = NA, size = 1) +
-      geom_line(size = .5) +
-      ggtitle(paste0("Intensity Cue", " ", x, "\U00B0")) +
-      scale_color_manual(values = colours.targets) +
-      guides(colour = "none", shape = "none", linetype = "none") +
-      xlab("") +
-      ylab("")
-    
-    plot(fig.lum)
-    ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/',
-                             'luminance_', x, '.pdf'), plot = fig.lum, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    #fig.dprime <- ggplot(values.dprime %>% filter(cue == "Luminance"), 
+    #                     aes(x = statValue, y = dprime, colour = TARGET)) + 
+    #  facet_grid(~statType, scale = "free_x", labeller = to_string, switch = "both") + 
+    #  geom_point(size = point.sz) +
+    #  #geom_point(data = invis.dprime, x = NA, size = 1) +
+    #  geom_line(size = .5) +
+    #  ggtitle(paste0("Intensity Cue", " ", x, "\U00B0")) +
+    #  scale_color_manual(values = colours.targets) +
+    #   scale_y_continuous(breaks = breaks) +
+    #   expand_limits(y = c(breaks[1], breaks[2])) +
+    #   guides(colour = "none", shape = "none", linetype = "none") +
+    #   xlab("") +
+    #   ylab("dprime")
+    # 
+    # plot(fig.dprime)
+    # ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/',
+    #                          'dprime_luminance_', x, '.pdf'), plot = fig.dprime, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
+    # 
+    # fig.lum <- ggplot(values.eccentricity %>% filter(cue == "Luminance"), aes(x = statValue, y = value, colour = TARGET, shape = bPresent, group =)) + 
+    #   facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+    #   geom_point(size = point.sz) +
+    #   geom_point(data = invis.lum, x = NA, size = 1) +
+    #   geom_line(size = .5) +
+    #   ggtitle(paste0("Intensity Cue", " ", x, "\U00B0")) +
+    #   scale_color_manual(values = colours.targets) +
+    #   guides(colour = "none", shape = "none", linetype = "none") +
+    #   xlab("") +
+    #   ylab("")
+    # 
+    # plot(fig.lum)
+    # ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/',
+    #                          'luminance_', x, '.pdf'), plot = fig.lum, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)
     
     # Edge Cue
     # Dprime 
@@ -190,15 +192,15 @@ plot.summary.statistics.cardinal <- function() {
     }
     
     fig.dprime <- ggplot(values.dprime %>% filter(cue == "Edge"), aes(x = statValue, y = dprime, colour = TARGET)) + 
-      facet_grid(~statType, scale = "free_x", labeller = to_string, switch = "both") + 
+      facet_grid(~statType, scales = axis.val.dprime, labeller = to_string, switch = "both") + 
       geom_point(size = point.sz) +
       #geom_point(data = invis.dprime, x = NA, size = 1) +
       geom_line(size = .5) +
       ggtitle(paste0("Edge Cue", " ", x, "\U00B0")) +
       scale_color_manual(values = colours.targets) +
-      scale_y_continuous(breaks = breaks) +
-      expand_limits(y = breaks) +
-      guides(colour = "none", shape = "none", linetype = "none") +
+      #scale_y_continuous(breaks = breaks) +
+      #expand_limits(y = breaks) +
+      guides(colour = colour.guide, shape = "none", linetype = "none") +
       xlab("") +
       ylab("dprime")
     
@@ -207,13 +209,13 @@ plot.summary.statistics.cardinal <- function() {
                              'dprime_edge_', x, '.pdf'), plot = fig.dprime, width = width.fig,height=height.fig,units = "in", useDingbats=FALSE)    
     
     fig.edge <- ggplot(values.eccentricity %>% filter(cue == "Edge"), aes(x = statValue, y = value, colour = TARGET, shape = bPresent)) + 
-      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      facet_grid(statistic~statType, scales = axis.val.stats, labeller = to_string, switch = "both") + 
       geom_point(size = point.sz) +
       geom_point(data = invis.edge, x = NA) +
       geom_line(size = .5) +
       ggtitle(paste0("Edge Cue", " ", x, "\U00B0")) +
       scale_color_manual(values = colours.targets) +
-      guides(colour = "none", shape = "none", linetype = "none") +
+      guides(colour = colour.guide, shape = "none", linetype = "none") +
       xlab("") +
       ylab("")
     
@@ -232,14 +234,14 @@ plot.summary.statistics.cardinal <- function() {
     }
     
     fig.dprime <- ggplot(values.dprime %>% filter(cue == "Pattern"), aes(x = statValue, y = dprime, colour = TARGET)) + 
-      facet_grid(~statType, scale = "free_x", labeller = to_string, switch = "both") + 
+      facet_grid(~statType, scales = axis.val.dprime, labeller = to_string, switch = "both") + 
       geom_point(size = point.sz) +
       #geom_point(data = invis.dprime, x = NA, size = 1) +
       geom_line(size = .5) +
       ggtitle(paste0("Pattern Cue", " ", x, "\U00B0")) +
       scale_color_manual(values = colours.targets) +
-      expand_limits(y = breaks) +
-      guides(colour = "none", shape = "none", linetype = "none") +
+      #expand_limits(y = breaks) +
+      guides(colour = colour.guide, shape = "none", linetype = "none") +
       xlab("") +
       ylab("dprime")
     
@@ -249,13 +251,13 @@ plot.summary.statistics.cardinal <- function() {
     
     fake.dat <- values.eccentricity %>% filter(cue == "Pattern") %>% group_by(statistic) %>% mutate(value = list(c(min(value), max(value)))) %>% unnest()
     fig.pattern <- ggplot(values.eccentricity %>% filter(cue == "Pattern"), aes(x = statValue, y = ((value)), colour = TARGET, shape = bPresent)) + 
-      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+      facet_grid(statistic~statType, scales = axis.val.stats, labeller = to_string, switch = "both") + 
       geom_point(size = point.sz) +
       geom_point(data = invis.pat, x = NA) +
       geom_line(size = .5) +
       ggtitle(paste0("Pattern Cue", " ", x, "\U00B0")) +
       scale_color_manual(values = colours.targets) +
-      guides(colour = "none", shape = "none", linetype = "none") +      
+      guides(colour = colour.guide, shape = "none", linetype = "none") +
       xlab("") +
       ylab("")    
     
@@ -277,15 +279,15 @@ plot.summary.statistics.cardinal <- function() {
     }
     
     fig.dprime <- ggplot(values.dprime.combined, aes(x = statValue, y = dprime, colour = TARGET)) + 
-      facet_grid(~statType, scale = "free", labeller = to_string, switch = "both") + 
+      facet_grid(~statType, scales = axis.val.dprime, labeller = to_string, switch = "both") + 
       geom_point(size = point.sz) +
       #geom_point(data = invis.dprime, x = NA, size = 1) +
       geom_line(size = .5) +
       ggtitle(paste0("Combined Cues", " ", x, "\U00B0")) +
       scale_color_manual(values = colours.targets) +
       scale_y_continuous(breaks = breaks) +
-      expand_limits(y = breaks) +
-      guides(colour = "none", shape = "none", linetype = "none") +
+      #expand_limits(y = breaks) +
+      guides(colour = colour.guide, shape = "none", linetype = "none") +
       xlab("") +
       ylab("dprime")
     
@@ -300,8 +302,8 @@ plot.summary.statistics.cardinal <- function() {
                  legend.key.width = unit(.75,"cm"))      
     
     ##
-    fig.lum.axis <- ggplot(values.eccentricity %>% filter(cue == "Luminance"), aes(x = statValue, y = value, colour = TARGET, shape = bPresent)) + 
-      facet_grid(statistic~statType, scale = "free", labeller = to_string, switch = "both") + 
+    fig.lum.axis <- ggplot(values.eccentricity %>% filter(cue == "Edge"), aes(x = statValue, y = value, colour = TARGET, shape = bPresent)) + 
+      facet_grid(statistic~statType, scales = "free", labeller = to_string, switch = "both") + 
       geom_point(size = point.sz, aes(shape = bPresent), inherit.aes = T) +
       geom_line(aes(colour = TARGET), size = .5) +
       ggtitle(paste0("Luminance Cue", " ", x, "\U00B0")) +

@@ -1,3 +1,5 @@
+*.html
+notebooks
 *.txt
 *.csv
 *.mat

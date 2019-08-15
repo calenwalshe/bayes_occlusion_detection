@@ -1,0 +1,24 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1564015063902.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "7E24BAB4",
+    "lastKnownWriteTime" : 1564019023,
+    "last_content_update" : 1564019023404,
+    "path" : "/mnt/home/calen/Dropbox/Calen/Work/occluding/occlusion_detect/_model/export2matlab.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "11,0",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "0",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

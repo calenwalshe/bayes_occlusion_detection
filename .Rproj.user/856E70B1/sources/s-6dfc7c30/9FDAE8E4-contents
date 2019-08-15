@@ -126,9 +126,9 @@ plot_eccentricity_thresholds <- function() {
     scale_linetype_manual("", labels = my.labels[,2], values = my.labels[,4]) +
     scale_colour_manual("", labels = my.labels[,2], values= as.character(my.labels[,3])) +
     scale_x_continuous() +
-    scale_y_continuous(breaks = c(10, 20, 30, 40, 50)) +
-    expand_limits(y = c(10, 50)) +
-    coord_cartesian(ylim = c(0, 55)) +
+    scale_y_continuous(breaks = c(0, 15, 30, 45)) +
+    expand_limits(y = c(0, 50)) +
+    coord_cartesian(ylim = c(0, 50)) +
     guides(shape = FALSE)
   
   plot(t.1.plot)  

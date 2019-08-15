@@ -1,0 +1,421 @@
+rm(list = ls())
+# Produce Scene Statistics Figure
+  library(tidyr)
+  library(ggplot2)
+  library(ggthemes)
+  library(dplyr)
+  library(purrrlyr)
+  library(purrr)
+  
+  summarize <- dplyr::summarise
+  
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/plot_theme.R')
+  source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
+  load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error2d.rdata")
+  
+  # figure.conf
+  palettes <- ggthemes_data[["tableau"]][["color-palettes"]][["regular"]]  
+  
+  axis.val.dprime <- "free"
+  axis.val.stats  <- "free"
+  colours.targets <- palettes$`Tableau 10`$value[1:2]  
+  colours.dprime  <- palettes$`Tableau 10`$value[3]
+  width.fig <- 7
+  height.fig = 7
+  
+  panel.border.sz <- 1
+  tick.sz         <- 1
+  axis.text.sz    <- 10
+  axis.title.sz   <- 8
+  panel.text.sz   <- 5
+  point.sz        <- 1.25
+  line.sz         <- .25
+  
+  tick.ln = .075
+  
+  theme_set(theme_bw())
+  theme_update(aspect.ratio = 1, 
+               axis.ticks = element_line(size = tick.sz),
+               panel.background = element_rect(fill = "white"),
+               axis.ticks.length = unit(tick.ln, "cm"),
+               axis.text.y.right = element_text(color = colours.targets[1]),
+               axis.text.y.left = element_text(color = colours.targets[2]),
+               axis.text = element_text(size = axis.text.sz),
+               axis.title.x = element_text(size = axis.title.sz),
+               axis.title.y = element_text(size = axis.title.sz),
+               panel.grid.major = element_blank(), 
+               panel.grid.minor = element_blank(),
+               legend.title=element_blank(),
+               legend.text = element_text(size = 12),
+               legend.key.size = unit(20, "pt"),
+               panel.border = element_rect(fill=NA, colour = "#19181A", size=panel.border.sz),
+               plot.title = element_text(hjust = 0.5),
+               legend.key=element_blank(),
+               strip.placement = "outside",
+               strip.background  = element_blank(),
+               strip.text = element_text(size = panel.text.sz),
+               plot.margin = unit(c(0,3,0,0), "pt"))
+  
+  colour.guide <- guide_legend(label.theme = element_text(size = 10))
+  shape.guide  <- guide_legend(label.theme = element_text(size = 10))
+  
+  
+  # figure.conf.end
+
+  
+  
+  bin.values <- get_experiment_bin_values()
+  
+  values.df <- model.error %>%
+    select(TARGET, BIN, eccentricity,data_sd_vec_0, data_sd_vec_1, data_mean_vec_0, data_mean_vec_1)
+  
+  values.df$edge.sd.abs <- map(values.df$data_sd_vec_0, 1)
+  #values.df$mean.sd.abs <- map(values.df$data_sd_vec_0, 2)
+  values.df$pattern.sd.abs <- map(values.df$data_sd_vec_0, 2)
+  
+  values.df$edge.mean.abs <- map(values.df$data_mean_vec_0, 1)
+  #values.df$mean.mean.abs <- map(values.df$data_mean_vec_0, 2)
+  values.df$pattern.mean.abs <- map(values.df$data_mean_vec_0, 2)
+  
+  values.df$edge.sd.pres <- map(values.df$data_sd_vec_1, 1)
+  #values.df$mean.sd.pres <- map(values.df$data_sd_vec_1, 2)
+  values.df$pattern.sd.pres <- map(values.df$data_sd_vec_1, 2)
+  
+  values.df$edge.mean.pres <- map(values.df$data_mean_vec_1, 1)
+  #values.df$mean.mean.pres <- map(values.df$data_mean_vec_1, 2)
+  values.df$pattern.mean.pres <- map(values.df$data_mean_vec_1, 2)  
+  
+  values.df <- values.df %>% select(-contains("data"))
+  
+  values.df <- values.df %>% gather("name","value",4:11)
+  
+  values.df <- values.df %>% separate(name, c("cue", "statistic", "bPresent"))
+  
+  values.df <- left_join(values.df, bin.values, by = c("TARGET", "BIN"))
+  
+  values.df$value <- do.call(rbind, values.df$value)
+  
+  values.df$cue <- factor(values.df$cue, levels = c("edge", "pattern"), labels = c("Edge", "Pattern"))
+  values.df$statType <- factor(values.df$statType, levels = c("Lvals", "Cvals", "Svals"), labels = c("Luminance", "Contrast", "Similarity"))
+  values.df$statistic <- factor(values.df$statistic, levels = c("mean", "sd"), labels = c("Mean", "Standard Deviation"))
+  
+  values.df$TARGET <- factor(values.df$TARGET, levels = c("vertical", "horizontal", "bowtie", "spot"))
+  
+  values.df$statValue[values.df$statType == "Luminance"] <- values.df$statValue[values.df$statType == "Luminance"] / 100
+  to_string <- as_labeller(c(`Luminance` = "Luminance (Rel)", `Contrast` = "Contrast (RMS)", `Similarity` = "Similarity", `Mean` = "Mean", `Standard Deviation` = "Standard Deviation"))
+  
+  values.dprime <- values.df %>% select(TARGET, BIN, eccentricity, cue, statistic, bPresent, value) %>% unique() %>% 
+    spread(statistic, value) %>% 
+    group_by(TARGET, BIN, eccentricity, cue) %>%
+    summarize(mean = abs(diff(Mean)), sd = sqrt(sum((`Standard Deviation`)^2)), dprime = mean/sd) %>% select(TARGET, BIN, eccentricity, cue, dprime)
+  
+  values.df.1 <- values.df %>%
+    filter(round(eccentricity) %in% c(0, 12))
+  
+  values.dprime$TARGET <- factor(values.dprime$TARGET, levels = c("vertical", "horizontal", "bowtie", "spot"))
+  
+  breaks.vals <- values.df.1 %>%
+    filter(round(eccentricity) %in% c(0, 12)) %>%
+    group_by(statistic, cue, statType, eccentricity, bPresent) %>%
+    summarize(min.val = min(value), max.val = max(value), scale =1, breaks.left = 1, breaks.right =1) %>% arrange(statistic, cue, eccentricity, bPresent, statType) %>% data.frame()
+  
+  breaks.vals$expand.low <- -1
+  breaks.vals$expand.high <- -1
+  
+  # Fovea, Mean, Edge
+  breaks.vals[1:6,]$breaks.left <- list(c(.61, .65, .69))
+  breaks.vals[1:6,]$scale <- .7
+  breaks.vals[1:6,]$breaks.right <- list(c(.61, .65, .69)/.7)
+  breaks.vals[1:6,]$expand.low <- .6
+  breaks.vals[1:6,]$expand.high <- .7
+  
+  # Periperhy, Mean, Edge
+  breaks.vals[7:12,]$breaks.left <- list(c(.65, .73, .81))
+  breaks.vals[7:12,]$scale <- .83
+  breaks.vals[7:12,]$breaks.right <- list(c(.65, .73, .81) / .82)
+  breaks.vals[7:12,]$expand.low <- .65
+  breaks.vals[7:12,]$expand.high <- .81
+  
+  # Fovea, Mean, Pattern Luminance
+  breaks.vals[c(13,16),]$breaks.left <- list(c(0, 6.5, 12.5))
+  breaks.vals[c(13,16),]$scale <- .06
+  breaks.vals[c(13,16),]$breaks.right <- list(round(c(0, 6, 12)/.06))
+  breaks.vals[c(13,16),]$expand.low <- 0
+  breaks.vals[c(13,16),]$expand.high <- 6
+  
+  # other
+  breaks.vals[c(14,15,17,18),]$breaks.left <- list(c(-.3, 0, .3))
+  breaks.vals[c(14,15,17,18),]$scale <- .02
+  breaks.vals[c(14,15,17,18),]$breaks.right <- list(c(-.3, 0, .3)/.02)
+  breaks.vals[c(14,15,17,18),]$expand.low <- -.3
+  breaks.vals[c(14,15,17,18),]$expand.high <- .3
+  ##
+  
+  # Periphery, Mean, Pattern Luminance
+  breaks.vals[c(13,16)+6,]$breaks.left <- list(c(0, 4.5, 8.5, 12.5))
+  breaks.vals[c(13,16)+6,]$scale <- .06
+  breaks.vals[c(13,16)+6,]$breaks.right <- list(round(c(0, 4.5, 8.5, 12.5) / .06))
+  breaks.vals[c(13,16)+6,]$expand.low <- 0
+  breaks.vals[c(13,16)+6,]$expand.high <- 12
+  
+  # other
+  breaks.vals[c(14,15,17,18)+6,]$breaks.left <- list(c(-.2, 0, .2, .4))
+  breaks.vals[c(14,15,17,18)+6,]$scale <- .02
+  breaks.vals[c(14,15,17,18)+6,]$breaks.right <- list(c(-.2, 0, .24, .4)/.02)
+  breaks.vals[c(14,15,17,18)+6,]$expand.low <- -.2
+  breaks.vals[c(14,15,17,18)+6,]$expand.high <- .4
+  ##  
+  
+  # Fovea, SD, Edge
+  breaks.vals[1:6+24,]$breaks.left <- list(c(0, .07, .14))
+  breaks.vals[1:6+24,]$scale <- 1/.3
+  breaks.vals[1:6+24,]$breaks.right <- list(c(0, .07, .12) * .3)
+  breaks.vals[1:6+24,]$expand.low <- 0
+  breaks.vals[1:6+24,]$expand.high <- .14
+  
+  # Periphery, SD, Edge
+  breaks.vals[1:6+24 + 6,]$breaks.left <- list(c(0, .10, .2))
+  breaks.vals[1:6+24 + 6,]$scale <- 1
+  breaks.vals[1:6+24 + 6,]$breaks.right <- list(c(0, .10, .2))
+  breaks.vals[1:6+24 + 6,]$expand.low <- 0
+  breaks.vals[1:6+24 + 6,]$expand.high <- .2
+  
+  # Fovea, SD, Pattern, Luminance
+  breaks.vals[c(13,16)+24,]$breaks.left <- list(c(0, 20.5, 40.5))
+  breaks.vals[c(13,16)+24,]$scale <- 1/.1
+  breaks.vals[c(13,16)+24,]$breaks.right <- list(round(c(0, 20, 40) * .1))
+  breaks.vals[c(13,16)+24,]$expand.low <- 0
+  breaks.vals[c(13,16)+24,]$expand.high <- 40
+  #
+  
+  # Fovea, SD, Pattern, Other
+  breaks.vals[c(14,15, 17, 18)+24,]$breaks.left <- list(c(.5, 1.1, 1.7))
+  breaks.vals[c(14,15, 17, 18)+24,]$scale <- 1/.15
+  breaks.vals[c(14,15, 17, 18)+24,]$breaks.right <- list(c(.5, 1.2, 1.9) * .15)
+  breaks.vals[c(14,15, 17, 18)+24,]$expand.low <- .5
+  breaks.vals[c(14,15, 17, 18)+24,]$expand.high <- 1.9
+  ##
+
+  # Periphery, SD, Pattern, Luminance
+  breaks.vals[c(13,16)+24 + 6,]$breaks.left <- list(c(0, 20.5, 40.5))
+  breaks.vals[c(13,16)+24 + 6,]$scale <- 1/.5
+  breaks.vals[c(13,16)+24 + 6,]$breaks.right <- list(round(c(0, 20, 40) * .5))
+  breaks.vals[c(13,16)+24 + 6,]$expand.low <- 0
+  breaks.vals[c(13,16)+24 + 6,]$expand.high <- 40
+  #
+  
+  # Periphery, SD, Pattern, Other
+  breaks.vals[c(14,15, 17, 18)+24 + 6,]$breaks.left <- list(c(.5, 1.25, 2))
+  breaks.vals[c(14,15, 17, 18)+24 + 6,]$scale <- 1
+  breaks.vals[c(14,15, 17, 18)+24 + 6,]$breaks.right <- list(c(.5, 1.25, 2) * 1)
+  breaks.vals[c(14,15, 17, 18)+24 + 6,]$expand.low <- .5
+  breaks.vals[c(14,15, 17, 18)+24 + 6,]$expand.high <- 2
+  ##
+  
+  breaks.vals$x.low  <- 0
+  breaks.vals$x.high <- 100
+  breaks.vals$x.breaks <- list(c(1,1,1,1,1,1))
+  
+  breaks.vals[breaks.vals$statType == "Luminance", ]$x.low  <- .03
+  breaks.vals[breaks.vals$statType == "Luminance", ]$x.high <- .75
+  breaks.vals[breaks.vals$statType == "Luminance", ]$x.breaks <- list(c(0, .25, .5, .75))
+  
+  breaks.vals[breaks.vals$statType == "Contrast", ]$x.low  <- 0
+  breaks.vals[breaks.vals$statType == "Contrast", ]$x.high <- .9
+  breaks.vals[breaks.vals$statType == "Contrast", ]$x.breaks <- list(c(0, .3, .6, .9))
+  
+  breaks.vals[breaks.vals$statType == "Similarity", ]$x.low  <- .4
+  breaks.vals[breaks.vals$statType == "Similarity", ]$x.high <- .9
+  breaks.vals[breaks.vals$statType == "Similarity", ]$x.breaks <- list(c(.40, .55, .70, .85))
+  
+  values.df.w.breaks <- left_join(values.df.1, breaks.vals, by = c("eccentricity", "cue", "statistic", "bPresent", "statType"))
+  
+  values.df.w.breaks.1 <- values.df.w.breaks %>% group_by(statistic, cue, statType, eccentricity, statType) %>% nest() %>% arrange(cue, statType, eccentricity, statistic)
+  
+  levels(values.df.w.breaks.1$statType)[which(levels(values.df.w.breaks.1$statType) == "Luminance")] <- "Luminance (Rel)"
+  levels(values.df.w.breaks.1$statType)[which(levels(values.df.w.breaks.1$statType) == "Contrast")] <- "Contrast (RMS)"
+  
+  #levels(values.df.w.breaks.1$statistic)[which(levels(values.df.w.breaks.1$statistic) == "Mean")] <- "\U039C"
+  
+  values.df.w.breaks.1 <- values.df.w.breaks.1 %>% mutate(left.axis.label = as.character(statistic))
+  
+  #values.df.w.breaks.1$left.axis.label[which(values.df.w.breaks.1$left.axis.label == "Mean")] <- "\U03BC"
+  #values.df.w.breaks.1$left.axis.label[which(values.df.w.breaks.1$left.axis.label == "Standard Deviation")] <- "\U03C3"
+  
+  values.df.w.breaks.1 <- values.df.w.breaks.1 %>% arrange(statistic, cue, eccentricity, cue)
+
+  #values.df.w.breaks.1.test <- values.df.w.breaks.1 %>% filter(statistic == "Standard Deviation", cue == "Pattern", eccentricity > 0)
+  
+  
+  my.plots <- by_row(values.df.w.breaks.1, function(x) {
+    stat.name       <- as.character(x$statistic[1])
+    stat.type.name  <- as.character(x$statType[1])
+    eccentricity    <- as.character(x$eccentricity[1])
+    cue             <- as.character(x$cue[1])
+    statistic       <- as.character(x$statistic[1])
+    statistic.data  <- x$data[[1]]
+    expand.low  <- statistic.data$expand.low[[1]]
+    expand.high <- statistic.data$expand.high[[1]]
+    left.axis   <- x$left.axis.label[[1]]
+    
+    left.breaks   <- statistic.data$breaks.left[[1]]
+    right.breaks  <- statistic.data$breaks.right[[1]]
+    axis.scale    <- statistic.data$scale[1]
+    
+    x.breaks <- statistic.data$x.breaks[[1]]
+    x.low <- min(x.breaks)
+    x.high <- max(x.breaks)
+    
+    statistic.data$value[statistic.data$bPresent == "pres"] <- statistic.data$value[statistic.data$bPresent == "pres"] * axis.scale
+    
+    statistic.data$bPresent <- factor(statistic.data$bPresent, levels = c("pres", "abs"), labels = c("Present", "Absent"))
+    
+    fig.stat <- ggplot(statistic.data, 
+                         aes(x = statValue, y = round(value,2), colour = bPresent, shape = TARGET)) + 
+      geom_point(size = point.sz) +
+      geom_line(size = line.sz) +
+      ggtitle(paste0(cue, " Cue", " ", eccentricity, "\U00B0")) +
+      scale_color_manual(values = colours.targets) +
+      guides(colour = colour.guide, shape = shape.guide, linetype = "none") +
+      expand_limits(x = c(x.low, x.high), y = c(expand.low, expand.high)) +
+      ylab(left.axis) +
+      xlab(stat.type.name) +
+      scale_x_continuous(breaks = x.breaks) +
+      scale_y_continuous(breaks = round(left.breaks,2),
+                         expand = expand_scale(mult = .1),
+                         #labels = scales::number_format(accuracy = 0.01, decimal.mark = '.'),
+                         sec.axis = sec_axis(~ . / axis.scale, 
+                                             breaks = round(right.breaks,2))) +
+      theme(aspect.ratio = 1)
+  
+    #plot(fig.stat)  
+    
+  }, .to = "ggplot_fig")
+  
+  
+  values.dprime.1 <- left_join(values.dprime, bin.values, by = c("TARGET", "BIN")) %>% filter(round(eccentricity) %in% c(0, 12))
+  
+  values.dprime.1$statType <- factor(values.dprime.1$statType, levels = c("Lvals", "Cvals", "Svals"), labels = c("Luminance", "Contrast", "Similarity"))
+  
+  values.dprime.1$statValue[values.dprime.1$statType == "Luminance"] <- values.dprime.1$statValue[values.dprime.1$statType == "Luminance"] / 100
+  
+  values.dprime.1.nest <- values.dprime.1 %>% 
+    group_by(statType, cue, eccentricity) %>% 
+    nest()
+
+  values.dprime.1.nest$breaks.y <- 1
+  values.dprime.1.nest$breaks.x <- 1
+  values.dprime.1.nest$x.low <- 0
+  values.dprime.1.nest$x.high <- 1
+  values.dprime.1.nest$y.low <- 0
+  values.dprime.1.nest$y.high <- 1  
+  
+  values.dprime.1.nest <- values.dprime.1.nest %>% arrange(cue, eccentricity, statType)
+  
+  values.dprime.1.nest[c(1,2,3),]$breaks.y <- list(c(2.5, 3.8, 5.1))
+  values.dprime.1.nest[c(4,5,6),]$breaks.y <- list(c(.25, 1.75, 3.25))
+  
+  values.dprime.1.nest[c(7),]$breaks.y <- list(c(0, 30.5, 60.5))
+  values.dprime.1.nest[c(10),]$breaks.y <- list(c(0, 18.5, 36.5))
+  
+  values.dprime.1.nest[c(8,9),]$breaks.y <- list(c(4.5,8.5,12.5))
+  values.dprime.1.nest[c(11,12),]$breaks.y <- list(c(0,4.5,8.5))
+
+  values.dprime.1.nest[c(1,4,7,10),]$breaks.x    <-   list(c(0, .25, .5, .75)) 
+  values.dprime.1.nest[c(1,4,7,10)+1,]$breaks.x <- list(c(0, .3, .6, .9))
+  values.dprime.1.nest[c(1,4,7,10)+2,]$breaks.x <- list(c(.40, .55, .70, .85))  
+  
+  levels(values.dprime.1.nest$statType)[which(levels(values.dprime.1.nest$statType) == "Luminance")] <- "Luminance (Rel)"
+  levels(values.dprime.1.nest$statType)[which(levels(values.dprime.1.nest$statType) == "Contrast")] <- "Contrast (RMS)"
+  
+  my.plot.dprime <- by_row(values.dprime.1.nest, function(xx) {
+    
+    stat.name       <- "dprime"
+    stat.type.name  <- as.character(xx$statType[1])
+    eccentricity    <- as.character(xx$eccentricity[1])
+    cue             <- as.character(xx$cue[1])
+    statistic       <- "dprime"
+    statistic.data  <- xx$data[[1]]
+    expand.low  <- min(xx$breaks.y[[1]])
+    expand.high <- max(xx$breaks.y[[1]])
+    left.axis   <- "dprime"
+    
+    left.breaks   <- xx$breaks.y[[1]]
+    
+    x.breaks <- xx$breaks.x[[1]]
+    x.low    <- min(x.breaks)
+    x.high   <- max(x.breaks)
+    
+    fig.stat <- ggplot(statistic.data, 
+                       aes(x = statValue, y = dprime, shape = TARGET)) + 
+      geom_point(size = point.sz, colour = colours.dprime) +
+      geom_line(size = line.sz, colour = colours.dprime) +
+      ggtitle(paste0(cue, " Cue", " ", eccentricity, "\U00B0")) +
+      expand_limits(x = c(x.low, x.high), y = c(expand.low, expand.high)) +
+      ylab(left.axis) +
+      xlab(stat.type.name) +
+      scale_x_continuous(breaks = x.breaks) +
+      scale_y_continuous(breaks = round(left.breaks,2),
+                         expand = expand_scale(mult = .1),
+                         sec.axis = sec_axis(~ . / 1, 
+                                             breaks = round(left.breaks,2))) +
+      theme(aspect.ratio = 1, axis.ticks.y.right = element_line(colour = "white", size = 0), axis.text.y.right = element_text(color = "white"), axis.text.y.left = element_text(color = "black")) + guides(shape = FALSE)
+    
+  
+    #plot(fig.stat)
+    
+    #return(fig.stat)
+    
+  }, .to = "ggplot_fig")
+  
+  my.plots.stats.subset <- my.plots %>% select(statistic,statType, cue, eccentricity, ggplot_fig)
+  my.plots.dprime.subset <- my.plot.dprime %>% mutate(statistic = "dprime") %>% select(statistic, statType, cue, eccentricity, ggplot_fig)
+  
+  my.plots.all <- do.call(rbind, list(my.plots.stats.subset, my.plots.dprime.subset))
+  
+  ## Draw Full Figure ##
+  
+  means.draw <- my.plots.all %>% filter() %>% arrange(cue, eccentricity, statistic, statType)
+  
+  means.draw$ggplot_fig[which(means.draw$statistic != "dprime")] <- map(means.draw$ggplot_fig[which(means.draw$statistic != "dprime")], function(x) {
+    plot.fig <- x + 
+      theme(axis.text.x = element_blank(),axis.title.x=element_blank())
+      
+  })
+  
+  #means.draw$ggplot_fig[which(means.draw$statType != "Luminance (Rel")] <- map(means.draw$ggplot_fig[which(means.draw$statType != "Luminance (Rel")], function(x) {
+  #  plot.fig <- x + 
+  #    theme(axis.title.y = element_blank())
+  #  
+  #})  
+  
+  means.draw$ggplot_fig <- map(means.draw$ggplot_fig, function(x) {
+    plot.fig <- x + 
+      guides(colour = FALSE, shape = FALSE) + 
+      theme(panel.background = element_blank(), 
+            legend.title = element_blank(), 
+            plot.title = element_blank(),
+            axis.title.x = element_blank(),
+            strip.background = element_blank(),
+            axis.title.y = element_blank())
+  })
+  
+  fig.fovea.edge     <- plot_grid(plotlist = means.draw$ggplot_fig[1:9], ncol = 3, align = "vh")
+  fig.periphery.edge <- plot_grid(plotlist = means.draw$ggplot_fig[10:18], ncol = 3,  align = "vh")
+  fig.fovea.pattern  <- plot_grid(plotlist = means.draw$ggplot_fig[19:27], ncol = 3, align = "vh")
+  fig.periphery.pattern <- plot_grid(plotlist = means.draw$ggplot_fig[28:36], ncol = 3, align = "vh")
+  
+  
+  height = 7
+  width = 8
+  ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'fovea.edge', '.pdf'), plot = fig.fovea.edge, width = width, height = height, unit = "in", useDingbats=FALSE)
+  ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'periphery.edge', '.pdf'), plot = fig.periphery.edge, width = width, height = height, unit = "in", useDingbats=FALSE)
+  ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'fovea.pattern', '.pdf'), plot = fig.fovea.pattern, width = width, height = height, unit = "in", useDingbats=FALSE)
+  ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'periphery.pattern', '.pdf'), plot = fig.periphery.pattern, width = width, height = height, unit = "in", useDingbats=FALSE)
+  
+  one.fig.guide <- means.draw$ggplot_fig[[1]] + guides(colour = guide_legend(), shape = guide_legend())
+  ggsave(filename = paste0('~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/_figures/', 'legend', '.pdf'), plot = one.fig.guide, width = 4, height = 4, unit = "in", useDingbats=FALSE)
+  
+  
+  
+  

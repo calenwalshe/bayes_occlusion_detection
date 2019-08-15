@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1563899115676.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "6642034F",
+    "lastKnownWriteTime" : 1563980217,
+    "last_content_update" : 1563980217534,
+    "path" : "~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/save_distribution.R",
+    "project_path" : "_model/save_distribution.R",
+    "properties" : {
+        "cursorPosition" : "148,4",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

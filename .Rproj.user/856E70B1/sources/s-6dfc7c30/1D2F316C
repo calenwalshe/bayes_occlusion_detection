@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1565797005765.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "1D2F316C",
+    "lastKnownWriteTime" : 1565907881,
+    "last_content_update" : 1565907883625,
+    "path" : "/mnt/home/calen/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/2d_distribution/2d_density.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "11,22",
+        "scrollLine" : "0",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

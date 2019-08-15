@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1564065752633.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "1|46|61|0|\n64|37|69|0|\n72|41|104|0|\n107|30|125|0|\n129|67|177|0|\n139|21|149|2|\n",
+    "hash" : "9979687",
+    "id" : "901E7BC8",
+    "lastKnownWriteTime" : 1563981036,
+    "last_content_update" : 1564152189400,
+    "path" : "~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R",
+    "project_path" : "_model/import_model.R",
+    "properties" : {
+        "cursorPosition" : "51,40",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 10,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

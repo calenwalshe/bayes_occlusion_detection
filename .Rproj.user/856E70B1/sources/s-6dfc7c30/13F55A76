@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1565715733488.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "13F55A76",
+    "lastKnownWriteTime" : 1565712329,
+    "last_content_update" : 1565712329,
+    "path" : "~/Dropbox/Calen/Work/occluding/occlusion_detect/_paper1figures/scene_statistics_figure/scene_stats_new.R",
+    "project_path" : "_paper1figures/scene_statistics_figure/scene_stats_new.R",
+    "properties" : {
+        "cursorPosition" : "11,2",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

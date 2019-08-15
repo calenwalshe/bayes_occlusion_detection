@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1563900256014.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "EC1AEB94",
+    "lastKnownWriteTime" : 1564066525,
+    "last_content_update" : 1564092415199,
+    "path" : "~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/model_visualization.R",
+    "project_path" : "_model/model_visualization.R",
+    "properties" : {
+        "cursorPosition" : "112,47",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 9,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

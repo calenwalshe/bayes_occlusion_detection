@@ -1,0 +1,24 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1564019034987.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "70EE67C1",
+    "lastKnownWriteTime" : 1564065698,
+    "last_content_update" : 1564065698234,
+    "path" : "/mnt/home/calen/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_error_matlab.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "8,0",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "0",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 9,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

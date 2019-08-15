@@ -1,0 +1,18 @@
+init.a <- 2
+tot    <- 20
+
+steps <- replicate(10000, c(init.a, init.a + cumsum(rbernoulli(1000)*2 - 1)))
+
+transitions <- apply(steps, 2, FUN = function(x) {
+  x[1:first(which(x == 0 | x == tot))]  
+})
+
+n.trans <- 1:length(transitions)
+
+step.state.pair <- map2(transitions, n.trans, function(x,y) {data.frame(step = 1:length(x), state = x, walk.n = y)})
+
+step.state.frame <- do.call(rbind, step.state.pair)
+
+ggplot(step.state.frame %>% filter(walk.n == 7), aes(x = step, y = state, group = walk.n)) + geom_step()
+
+step.state.frame %>% summarize(sum(state == 20) / (sum(state == 20) + sum(state == 0)))

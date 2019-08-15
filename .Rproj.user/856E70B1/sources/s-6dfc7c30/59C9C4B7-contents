@@ -159,8 +159,6 @@ bootstrap.psychometrics <- function(human.psychometrics, n_samples) {
   source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_human/export_responses.R')
   load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/human.psychometrics.rdata")
   
-  summarize <- dplyr::summarise
-  
   raw.data <- export.responses()
   
   raw.data$observer <- raw.data$SUBJECT
@@ -168,13 +166,13 @@ bootstrap.psychometrics <- function(human.psychometrics, n_samples) {
   
   f <- function() {
     data.grouped <- raw.data %>%
-      filter(TRIAL != 1) %>%
       rename(eccentricity = ECCENTRICITY) %>%
       group_by(TARGET, observer, BIN) %>%
       sample_frac(1, replace = T) %>%
+      filter(TRIAL != 1) %>%
       nest()
 
-    data.grouped <- left_join(data.grouped, human.psychometrics %>% select(TARGET, observer, BIN, d0, e0, b), by = c("TARGET", "observer", "BIN"))
+    data.grouped <- left_join(data.grouped, human.psychometrics %>% select(TARGET, observer, BIN, b, d0), by = c("TARGET", "observer", "BIN"))
     
     data.grouped <- data.grouped %>% 
       group_by(TARGET, observer, BIN) %>% 
@@ -186,34 +184,25 @@ bootstrap.psychometrics <- function(human.psychometrics, n_samples) {
       HIT           <- data$HIT
       CORRECTREJECTION <- data$CORRECTREJECTION
       
-      b.start  <- x$b
-      e0.start <- x$e0
+      b.fix  <- x$b
       d0.fix <- x$d0
       
       f.mle <- function(x) {
         e0 <- x[1]
-        b  <- x[2]
         sample <- (1 / 2 * (-1 + (HIT |
-                                    CORRECTREJECTION) * 2) * d0.fix * e0 ^ b.start / (e0 ^ b.start + eccentricity ^ b.start))
+                                    CORRECTREJECTION) * 2) * d0.fix * e0 ^ b.fix / (e0 ^ b.fix + eccentricity ^ b.fix))
         
-        error.val <- -sum(pnorm(sample, mean = 0, sd = 1, log.p = T))
-        
-        if(is.infinite(error.val) | is.nan(error.val)){
-          error.val <- 10^5
-        }
-        return(error.val)
+        -sum(pnorm(sample, mean = 0, sd = 1, log.p = T))
       }
       
-      optim(par = c(e0 = e0.start), f.mle, method = "L-BFGS-B", lower = 0, upper = 80)
+      optim(par = c(e0 = 5), f.mle, method = "Brent", lower = 0, upper = 15)
     })
     
-    data.grouped$parameters = map(many.models.fixed.b, function(x) data.frame(as.list(c(x$par[1]))))
+    data.grouped$parameters = map(many.models.fixed.b, function(x) data.frame(as.list(c(e0 = x$par))))
     
-    data.grouped <- data.grouped %>% unnest(parameters)
-    data.grouped$d0 <- unlist(map(data.grouped$data, "d0"))
-    data.grouped$b <- unlist(map(data.grouped$data, "b"))
+    data.grouped <- data.grouped %>% unnest()
     
-    #data.grouped$data <- map(data.grouped$data, function(x) x %>% group_by(eccentricity) %>% summarize(pc = mean(CORRECT), dprime = qnorm(mean(HIT)) - qnorm(mean(FALSEALARM))))
+    data.grouped$data <- map(data.grouped$data, function(x) x %>% group_by(eccentricity) %>% summarize(pc = mean(CORRECT), dprime = qnorm(mean(HIT)) - qnorm(mean(FALSEALARM))))
     
     data.return <- data.grouped %>%
       get_threshold(.)
@@ -225,12 +214,7 @@ bootstrap.psychometrics <- function(human.psychometrics, n_samples) {
   
   tt <- map(all.boots, "threshold") %>% do.call(rbind,.)
   
-  ttt <- apply(tt, 2, FUN = function(x) {
-    x.new <- x[which(!(is.infinite(x) | is.na(x)))]
-    x.new.1 <- x.new[(x.new < (10 * median(x.new)))]
-    
-    sd(x.new.1)
-    })
+  ttt <- apply(tt, 2, sd)
   
   human.psychometrics$sd <- ttt
   

@@ -1,0 +1,31 @@
+## Plot 2D distributions ##
+## Author R. Calen Walshe
+
+rm(list = ls())
+
+source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/plot_theme.R')
+source('~/Dropbox/Calen/Work/occluding/occlusion_detect/_model/import_model.R')
+load("~/Dropbox/Calen/Work/occluding/occlusion_detect/_data/_model_response/model.error2d.rdata")
+
+x <- model.error[80,]
+
+f.fig <- function(x) {
+ response.absent  <- as_tibble(x$data_response_vec_0[[1]])
+ response.present <- as_tibble(x$data_response_vec_1[[1]])
+ 
+ response.measure <- rbind(data.frame(present = 1, response = response.present), data.frame(present = 0, response = response.absent)) %>% as_tibble()
+ 
+
+ lab.bin          <- as.numeric(x$BIN)
+ lab.eccentricity <- as.numeric(x$eccentricity)
+ lab.target       <- as.character(x$TARGET)
+ 
+ ggplot(response.measure, aes(x = response.edge, y = response.pattern, colour = as.factor(present))) + 
+   geom_point() + 
+   stat_ellipse(type = "norm")
+   
+   
+ 
+ 
+ 
+}

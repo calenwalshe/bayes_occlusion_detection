@@ -68,6 +68,8 @@ plot_eccentricity_thresholds <- function() {
   label.set$colours[1] <- "#3288bd"
   label.set$colours[5] <- "#fc8d59"
   
+  
+  
   my.labels <- (label.set[label.set$names %in% d.1$observer,])
   
   d.1$observer <- factor(d.1$observer, levels = my.labels[,1], labels = my.labels[,2])
